@@ -1,0 +1,8582 @@
+/* HLCC Frontend v8.7.1 */
+
+/* =====================================================
+   PWA Safe Area Support - 适配全面屏/刘海屏
+   ===================================================== */
+:root {
+  /* 获取系统安全区域 insets */
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+
+  /* 设置默认值，如果没有安全区域则为 0 */
+  --safe-area-top: max(var(--sat), 0px);
+  --safe-area-bottom: max(var(--sab), 0px);
+  --safe-area-left: max(var(--sal), 0px);
+  --safe-area-right: max(var(--sar), 0px);
+}
+
+/* =====================================================
+   Performance Optimizations - 性能优化
+   ===================================================== */
+/* 启用原生图片懒加载 */
+img {
+  loading: lazy;
+}
+
+/* 关键图片（首屏可见）使用 eager 加载 */
+.hlcc-topbar img,
+.hlcc-avatar img {
+  loading: eager;
+}
+
+/* GPU 加速动画 */
+.hlcc-card,
+.hlcc-modal,
+.hlcc-panel {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* PWA 全屏模式优化 */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior: none;
+    /* 防止下拉刷新 */
+    -webkit-user-select: none;
+    /* 防止长按选择文字 */
+    user-select: none;
+  }
+
+  /* 改善点击反馈 */
+  * {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+
+  /* 可交互元素恢复文本选择 */
+  input,
+  textarea,
+  [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/*
+ * HANDLock X Recovery System — Frontend Stylesheet
+ * -------------------------------------------------
+ * 本文件主要负责整个「行楽客户康复系统」前台界面的视觉表现：
+ *
+ *  - 全局布局（背景、app 容器、卡片）
+ *  - 首页「已进行 / 今日护理 / 为什么这样护理」等模块
+ *  - 弹窗（换药教程 / 当前状态）的样式
+ *  - 账号设置页（我的疗程 / 新增疗程）
+ *
+ * 维护约定：
+ *  1. 尽量在「模块级选择器」上方添加中文注释，说明用途（如：// 今日护理主卡片）
+ *  2. 针对特殊兼容 / Hotfix（例如：iOS Safari、特定 build 修复），用「build 标记」说明来源：
+ *        例如：/* build-0006p4: 修复换药教程标题遮挡系统提示 *\/
+ *  3. 将来如要重构视觉（例如 v0.3 全新 UI），建议保留这份文件作为“旧样式档案”，
+ *     而不是直接硬改——可以新建 frontend.v2.css 再逐步迁移。
+ *
+ * 当前代码结构基线：v0.2.2_build-0006p4（仅添加注释，不改任何视觉逻辑）
+ * 当前前台 UI 版本：v2.1.0_build-0300p1（CSS 视觉层：主页 + 账号设置 v2 + 弹窗布局 v3：换药教程全屏化 + 当前状态贴底 sheet）
+ */
+
+/* ========================================
+   DESIGN TOKENS (UI Pro Max v1.0)
+   ======================================== */
+:root {
+  /* Brand Colors */
+  --hlcc-primary: #3b82f6;
+  /* Blue-500 */
+  --hlcc-primary-hover: #2563eb;
+  /* Blue-600 */
+
+  /* Surfaces */
+  --hlcc-surface: #ffffff;
+  --hlcc-surface-muted: #f8fafc;
+  /* Slate-50 */
+  --hlcc-surface-glass: rgba(255, 255, 255, 0.85);
+
+  /* Typography */
+  --hlcc-text-main: #334155;
+  /* Slate-700 */
+  --hlcc-text-muted: #64748b;
+  /* Slate-500 */
+  --hlcc-text-light: #94a3b8;
+  /* Slate-400 */
+
+  /* Shapes & Effects */
+  --hlcc-radius: 16px;
+  --hlcc-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --hlcc-shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --hlcc-shadow-float: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --hlcc-font-sans: "Inter", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+/* ========================================
+   CRITICAL: Nuclear Reset for WordPress
+   ======================================== */
+/* Override ALL possible WordPress/theme interference */
+html,
+html.wp-toolbar,
+html[class*="admin"],
+html[style] {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 100vh !important;
+  /* PWA: Ensure background extends to safe areas */
+  min-height: 100dvh !important;
+}
+
+body,
+body.logged-in,
+body[class*="admin"],
+body[style] {
+  background-color: var(--hlcc-surface-muted) !important;
+  /* Match --hlcc-bg-page */
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  /* Dynamic viewport height for PWA */
+  height: 100% !important;
+}
+
+/* Force hide WordPress admin bar everywhere */
+#wpadminbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+/*
+ * Safe Entry Animation (Mobile First)
+ */
+@keyframes hlccFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hlcc-wrap>.hlcc-card {
+  /* Default hidden state for animation */
+  animation: hlccFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.hlcc-wrap>.hlcc-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.hlcc-wrap>.hlcc-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.hlcc-wrap>.hlcc-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.hlcc-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  /* PWA Fullscreen Adapter: Replace margin with padding + safe-area */
+  padding: calc(18px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+  font-family: var(--hlcc-font-sans);
+}
+
+.hlcc-wrap *,
+.hlcc-wrap *::before,
+.hlcc-wrap *::after {
+  box-sizing: border-box;
+}
+
+.hlcc-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  /* PWA 安全区域适配 - 确保顶部不被刘海遮挡 */
+  padding-top: calc(var(--safe-area-top) + 10px);
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+.hlcc-brand-line1 {
+  font-weight: 800;
+  letter-spacing: .5px;
+}
+
+.hlcc-brand-line2 {
+  font-size: 12px;
+  color: #6b7280;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* Online Status Interstitial (v7.5.3) */
+.hlcc-status-interstitial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  width: 100%;
+}
+
+.hlcc-online-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2);
+  animation: hlccPulse 2s infinite;
+}
+
+@keyframes hlccPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.hlcc-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Online Status (v7.5.3) */
+.hlcc-online-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 0.5px solid rgba(0, 0, 0, 0.05);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  cursor: help;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.hlcc-online-status:hover {
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .hlcc-online-text {
+    font-size: 11px;
+  }
+
+  .hlcc-online-status {
+    padding: 4px 8px;
+    margin-right: 4px;
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+.hlcc-link {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.hlcc-link:hover {
+  text-decoration: underline;
+}
+
+.hlcc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #3b82f6;
+  background: #3b82f6;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.hlcc-btn.ghost {
+  background: transparent;
+  color: #3b82f6;
+}
+
+/*
+ * 通用卡片样式
+ * 所有前台卡片（包括已进行、今日护理、账号设置中的卡片）都基于 .hlcc-card。
+ * 如需统一调整卡片圆角、阴影、背景色，可以从这里开始。
+ */
+.hlcc-card {
+  background: var(--hlcc-surface);
+  border: 1px solid #e2e8f0;
+  /* Slate-200 */
+  border-radius: var(--hlcc-radius);
+  padding: 16px 18px;
+  /* Increased padding for breathability */
+  margin: 16px 0;
+  box-shadow: var(--hlcc-shadow-card);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: hover) {
+  .hlcc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--hlcc-shadow-float);
+    border-color: #cbd5e1;
+    /* Slate-300 on hover */
+    /* Darker shadow on lift */
+  }
+}
+
+/* ========================================
+   UTILITIES (UI Pro Max)
+   ======================================== */
+.hlcc-text-green {
+  color: #22c55e;
+}
+
+.hlcc-text-red {
+  color: #ef4444;
+}
+
+.hlcc-text-amber {
+  color: #f59e0b;
+}
+
+.hlcc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.hlcc-badge-danger {
+  background-color: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+}
+
+.hlcc-badge-warning {
+  background-color: #fffbeb;
+  color: #f59e0b;
+  border: 1px solid #fef3c7;
+}
+
+/* Action List Enhancements */
+.hlcc-action-item {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  border-radius: 8px;
+  /* Stagger Animation - Removed opacity:0 to prevent visibility issues */
+  /* opacity: 0; */
+  animation: hlccFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hlcc-action-item:hover {
+  background-color: var(--hlcc-surface-muted);
+  transform: translateX(4px);
+}
+
+/* Stagger Delays (Support up to 10 items) */
+.hlcc-action-item:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.hlcc-action-item:nth-child(2) {
+  animation-delay: 0.10s;
+}
+
+.hlcc-action-item:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.hlcc-action-item:nth-child(4) {
+  animation-delay: 0.20s;
+}
+
+.hlcc-action-item:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+.hlcc-action-item:nth-child(6) {
+  animation-delay: 0.30s;
+}
+
+.hlcc-action-item:nth-child(n+7) {
+  animation-delay: 0.35s;
+}
+
+/* Taboo List Enhancements */
+.hlcc-taboo-item {
+  background-color: #fef2f2;
+  /* Red-50 */
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.hlcc-card-outline {
+  border: 2px solid #3b82f6;
+}
+
+.hlcc-card-row {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.hlcc-right {
+  min-width: 200px;
+  text-align: right;
+}
+
+.hlcc-muted {
+  color: #6b7280;
+}
+
+.hlcc-meta {
+  color: #6b7280;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.hlcc-strong {
+  font-weight: 800;
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.hlcc-big {
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: 6px;
+}
+
+.hlcc-big-unit {
+  font-size: 18px;
+  font-weight: 700;
+  margin-left: 6px;
+  color: #0f172a;
+}
+
+.hlcc-progress {
+  display: block;
+  box-sizing: border-box;
+  margin: 8px auto;
+  width: calc(100% - 4px);
+  max-width: 100%;
+  height: 10px;
+  background: #e7e5e4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hlcc-progress-bar {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 999px;
+}
+
+
+.hlcc-titlebar {
+  margin-bottom: 4px;
+}
+
+.hlcc-btn-sm {
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Do not force text alignment here. Content alignment should follow what admin configures. */
+
+.hlcc-today .hlcc-taboo {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hlcc-today .hlcc-h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.hlcc-h3 {
+  margin: 12px 0 6px;
+  font-size: 18px;
+}
+
+.hlcc-body p {
+  margin: 8px 0;
+  line-height: 1.55;
+}
+
+.hlcc-ul li {
+  margin: 4px 0;
+}
+
+.hlcc-taboo {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 14px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.hlcc-taboo-title {
+  color: #be123c;
+  font-weight: 900;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.hlcc-footer-note {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+
+.hlcc-step:last-child {
+  border-bottom: none;
+}
+
+.hlcc-video {
+  margin-top: 8px;
+}
+
+.hlcc-version {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* Login form (wp_login_form output) */
+.hlcc-login form {
+  margin-top: 12px;
+}
+
+.hlcc-login p {
+  margin: 0;
+}
+
+.hlcc-login .login-username,
+.hlcc-login .login-password,
+.hlcc-login .login-remember,
+.hlcc-login .login-submit {
+  margin-top: 12px;
+}
+
+.hlcc-login label {
+  display: block;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+
+.hlcc-login input[type="text"],
+.hlcc-login input[type="password"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  outline: 2px solid transparent;
+  /* Focus handled by border/box-shadow below */
+}
+
+.hlcc-login input[type="text"]:focus,
+.hlcc-login input[type="password"]:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+}
+
+.hlcc-login .login-remember {
+  margin-top: 10px;
+}
+
+.hlcc-login input[type="submit"] {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #3b82f6;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hlcc-login input[type="submit"]:hover {
+  filter: brightness(.98);
+}
+
+@media (max-width:560px) {
+  .hlcc-card-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hlcc-right {
+    text-align: left;
+    min-width: 0;
+  }
+
+  .hlcc-big {
+    font-size: 48px;
+  }
+
+  .hlcc-btn {
+    width: 100%;
+  }
+
+  .hlcc-btn-sm {
+    width: auto;
+    align-self: flex-start;
+  }
+}
+
+body .hlcc-step:first-child {
+  border-top: none;
+}
+
+.hlcc-step .hlcc-body {
+  margin: 0 auto;
+}
+
+.hlcc-video {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.hlcc-video .hlcc-link {
+  display: inline-block;
+}
+
+.hlcc-encourage {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f5f7ff;
+  color: #223;
+  font-weight: 600;
+  text-align: center;
+}
+
+.hlcc-title-rich p {
+  margin: 0;
+}
+
+
+/* Steps list (no numbering) */
+
+
+.hlcc-step:last-child {
+  border-bottom: 0;
+}
+
+.hlcc-step .hlcc-body {
+  margin: 0 auto;
+  max-width: 520px;
+}
+
+.hlcc-step .hlcc-video {
+  margin-top: 14px;
+}
+
+
+/* Account settings */
+.hlcc-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef2f7;
+}
+
+/*
+ * 账号设置内的分组标题
+ * 例如：「我的疗程」「新增疗程」等。
+ *
+ * build-0006 系列中，这里的视觉做过多次调整，
+ * 为了避免出现一整块「白底大框」包住全部内容，
+ * 已简化为纯文字分组 + 轻分隔线，整体更接近 iOS 设置界面。
+ */
+.hlcc-section-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.hlcc-account-title {
+  margin: 0 0 10px 0;
+}
+
+/*
+ * 单个疗程卡片（账号设置 → 我的疗程）
+ * 显示当前项目名称、操作日期、是否为当前疗程等。
+ * 若未来要为每个疗程增加更多 metadata（如标签、状态），
+ * 推荐在 HTML 里新增子元素，再从这里扩展布局。
+ */
+.hlcc-course-item {
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+
+.hlcc-course-name {
+  font-weight: 800;
+}
+
+.hlcc-mini {
+  display: inline-block;
+}
+
+.hlcc-btn-danger {
+  border-color: #ef4444;
+  background: #ef4444;
+  color: #fff;
+}
+
+.hlcc-btn-warning {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #fff;
+}
+
+.hlcc-btn-warning:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.hlcc-course-details {
+  margin-top: 10px;
+}
+
+.hlcc-course-summary {
+  cursor: pointer;
+  color: #3b82f6;
+  font-weight: 700;
+  list-style: none;
+}
+
+.hlcc-course-summary::-webkit-details-marker {
+  display: none;
+}
+
+/*
+ * 「新增疗程」按钮区域
+ * 与上方疗程列表在视觉上保持一定间距，避免被误认为同一张卡片。
+ */
+.hlcc-course-add {
+  margin-top: 12px;
+}
+
+.hlcc-select {
+  width: 100%;
+  padding: 12px 12px;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  font-size: 16px;
+  background: #fff;
+}
+
+.hlcc-field-inline {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.hlcc-field-inline input {
+  width: auto;
+}
+
+.hlcc-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.hlcc-field {
+  display: block;
+  margin-top: 10px;
+}
+
+.hlcc-field span {
+  display: block;
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.hlcc-field input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 12px;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+.hlcc-field input[type="date"] {
+  max-width: 100%;
+}
+
+@media (max-width:560px) {
+
+
+  .hlcc-course-buttons form {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+
+/* Mobile: make course rows wrap to avoid date input overflow */
+@media (max-width: 520px) {
+
+
+  .hlcc-course-actions .hlcc-btn {
+    flex: 1;
+  }
+
+  .hlcc-field input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
+  }
+}
+
+
+/* Mini video window (mobile friendly) */
+.hlcc-mini-player {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 240px;
+  max-width: calc(100vw - 28px);
+  z-index: 99999;
+  background: #fff;
+  border: 1px solid #e7e5e4;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+  overflow: hidden;
+}
+
+.hlcc-mini-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #000;
+}
+
+.hlcc-mini-player .hlcc-mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  font-weight: 800;
+}
+
+.hlcc-mini-player .hlcc-mini-close {
+  font-size: 22px;
+  line-height: 1;
+  text-decoration: none;
+  color: #111;
+  padding: 4px 8px;
+  border-radius: 10px;
+}
+
+
+/* === v0.1.4.9 Apple-ish refinement (mobile-first) === */
+.hlcc-wrap {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.hlcc-card {
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, .08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+}
+
+.hlcc-topbar {
+  padding: 14px 14px 10px;
+}
+
+.hlcc-topbar .hlcc-brand {
+  letter-spacing: .2px;
+}
+
+.hlcc-btn {
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.hlcc-btn-sm {
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+
+/* Account settings course list: compact + "More" */
+.hlcc-course-compact {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hlcc-course-left {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.hlcc-course-name {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hlcc-course-sub {
+  margin-top: 6px;
+  color: rgba(0, 0, 0, .6);
+  font-size: 13px;
+}
+
+.hlcc-course-more summary {
+  list-style: none;
+}
+
+.hlcc-course-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-course-more[open] summary {
+  background: rgba(0, 0, 0, .04);
+}
+
+.hlcc-more-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0, 0, 0, .12);
+}
+
+.hlcc-more-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 0 10px;
+}
+
+.hlcc-more-label {
+  color: rgba(0, 0, 0, .55);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.hlcc-more-value {
+  color: rgba(0, 0, 0, .85);
+  font-size: 13px;
+  text-align: right;
+  word-break: break-word;
+}
+
+.hlcc-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.hlcc-form-compact .hlcc-field {
+  margin: 10px 0;
+}
+
+.hlcc-form-compact .hlcc-field input,
+.hlcc-form-compact .hlcc-field select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.hlcc-form-compact input[type="date"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.hlcc-more-actions {
+  gap: 8px;
+}
+
+.hlcc-btn {
+  padding: 10px 14px;
+}
+
+
+/* === v0.1.4.10 account date overflow hard-fix === */
+.hlcc-more-body .hlcc-field {
+  width: 100%;
+}
+
+.hlcc-more-body .hlcc-field input[type="date"],
+.hlcc-more-body .hlcc-field input[type="text"],
+.hlcc-more-body .hlcc-field input[type="password"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.hlcc-more-actions form {
+  min-width: 0;
+}
+
+@media (max-width:520px) {
+  .hlcc-more-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hlcc-more-actions form {
+    width: 100%;
+  }
+
+  .hlcc-more-actions .hlcc-btn {
+    width: 100%;
+  }
+}
+
+
+/* === v0.1.4.11 build-0019: small-screen polish + date input hard-fix === */
+.hlcc-course-add input[type="date"],
+.hlcc-course-details input[type="date"],
+.hlcc-security input[type="date"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width:390px) {
+  .hlcc-topbar {
+    align-items: flex-start;
+  }
+
+  .hlcc-top-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .hlcc-top-actions .hlcc-btn.ghost {
+    padding: 8px 10px;
+    font-size: 14px;
+    border-radius: 14px;
+    max-width: 150px;
+    text-align: center;
+    line-height: 1.15;
+    white-space: normal;
+  }
+}
+
+/* Security accordion */
+.hlcc-security {
+  margin-top: 14px;
+}
+
+.hlcc-security .hlcc-security-body {
+  margin-top: 10px;
+}
+
+
+@media (max-width: 390px) {
+  .hlcc-wrap {
+    padding: 0 12px;
+  }
+
+  .hlcc-top-actions {
+    gap: 10px;
+  }
+
+  .hlcc-btn {
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 14px;
+  }
+
+  .hlcc-btn.ghost {
+    border-width: 1px;
+  }
+
+  .hlcc-link {
+    font-size: 14px;
+  }
+}
+
+
+.hlcc-course-more>summary.hlcc-btn {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+.hlcc-course-more[open]>summary.hlcc-btn {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  opacity: 1;
+}
+
+.hlcc-more-panel .hlcc-btn {
+  opacity: 1;
+}
+
+.hlcc-more-panel .hlcc-link,
+.hlcc-more-panel a {
+  color: #3b82f6;
+}
+
+.hlcc-more-panel .hlcc-btn.ghost {
+  color: #3b82f6;
+}
+
+.hlcc-more-panel .hlcc-btn.ghost:hover {
+  background: rgba(37, 99, 235, .08);
+}
+
+@media (max-width: 420px) {
+  .hlcc-top-actions {
+    gap: 8px;
+  }
+
+  .hlcc-top-actions .hlcc-btn.ghost {
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: 10px;
+  }
+
+  .hlcc-top-actions .hlcc-link {
+    font-size: 13px;
+  }
+}
+
+.hlcc-mini-player {
+  z-index: 999999;
+}
+
+
+.hlcc-top-actions .hlcc-btn.ghost {
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .hlcc-top-actions .hlcc-btn.ghost {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 12px;
+  }
+
+  .hlcc-top-actions {
+    gap: 8px;
+  }
+}
+
+.hlcc-course-more>summary.hlcc-btn.hlcc-btn-tertiary {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+  opacity: 1 !important;
+}
+
+.hlcc-course-more[open]>summary.hlcc-btn.hlcc-btn-tertiary {
+  background: #2563eb !important;
+  color: #fff !important;
+  border-color: #2563eb !important;
+  opacity: 1 !important;
+}
+
+.hlcc-course-details>summary.hlcc-btn.hlcc-btn-secondary {
+  background: #eef2ff !important;
+  color: #2563eb !important;
+  border-color: #c7d2fe !important;
+  opacity: 1 !important;
+}
+
+.hlcc-course-details[open]>summary.hlcc-btn.hlcc-btn-secondary {
+  background: #e0e7ff !important;
+  color: #2563eb !important;
+  border-color: #a5b4fc !important;
+  opacity: 1 !important;
+}
+
+.hlcc-more-panel .hlcc-btn.hlcc-btn-sm {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.hlcc-more-panel button,
+.hlcc-more-panel .hlcc-btn {
+  cursor: pointer;
+}
+
+
+#hlcc-mini-player {
+  z-index: 2147483647 !important;
+}
+
+#hlcc-mini-player .hlcc-mini-unmute {
+  border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(0, 0, 0, .35);
+  color: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+
+/* Mini player buttons */
+.hlcc-mini-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between
+}
+
+.hlcc-mini-unmute,
+.hlcc-mini-pip {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #fff;
+}
+
+.hlcc-mini-unmute:active,
+.hlcc-mini-pip:active {
+  transform: scale(.98)
+}
+
+/* Account 'More' panel emphasis */
+.hlcc-account .hlcc-more-btn,
+.hlcc-account .hlcc-btn-secondary,
+.hlcc-account .hlcc-btn,
+.hlcc-account button.hlcc-btn {
+  background: #0a58ff !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.hlcc-account .hlcc-btn-secondary:hover,
+.hlcc-account .hlcc-more-btn:hover {
+  filter: brightness(.96)
+}
+
+.hlcc-account .hlcc-btn-danger {
+  background: #ff3b30 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+
+/* --- HLCC refinements (build-0024) --- */
+.hlcc-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap
+}
+
+
+/* Account 'more' buttons emphasis */
+.hlcc-course-more summary.hlcc-btn,
+.hlcc-more-actions .hlcc-btn,
+.hlcc-more-actions button.hlcc-btn,
+.hlcc-more-actions a.hlcc-btn {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+}
+
+.hlcc-more-actions .hlcc-btn-tertiary {
+  background: #3b82f6 !important;
+}
+
+/* Mini video player: keep inline, no fullscreen controls */
+.hlcc-mini-video {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: min(48vw, 320px);
+  height: calc(min(48vw, 320px)*1.65);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, .42);
+  z-index: 999999;
+  overflow: hidden;
+
+  background: #ffffff !important;
+}
+
+.hlcc-mini-video.is-dragging {
+  opacity: .95
+}
+
+.hlcc-mini-video__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  font-weight: 700;
+  user-select: none;
+  cursor: grab
+}
+
+.hlcc-mini-video__head:active {
+  cursor: grabbing
+}
+
+.hlcc-mini-video__head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0
+}
+
+.hlcc-mini-video__handle {
+  width: 34px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .18);
+  flex: 0 0 auto
+}
+
+.hlcc-mini-video__btns {
+  display: flex;
+  gap: 8px
+}
+
+.hlcc-mini-video__btn {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, .12);
+  background: #fff;
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 13px
+}
+
+.hlcc-mini-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000
+}
+
+.hlcc-mini-video__bar {
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(0, 0, 0, .06)
+}
+
+.hlcc-mini-video__range {
+  width: 100%;
+}
+
+.hlcc-mini-video__time {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center
+}
+
+
+.hlcc-pill-project {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.hlcc-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hlcc-mini-video {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: min(48vw, 320px);
+  height: calc(min(48vw, 320px)*1.65);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, .42);
+  z-index: 999999;
+  overflow: hidden;
+
+  background: #ffffff !important;
+}
+
+.hlcc-mini-video * {
+  pointer-events: auto;
+}
+
+.hlcc-mini-video__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hlcc-mini-video__title {
+  font-weight: 700;
+  font-size: 0;
+}
+
+.hlcc-mini-video__btn {
+  cursor: pointer;
+  user-select: none;
+}
+
+.hlcc-mini-video__btn:active {
+  transform: scale(.98);
+}
+
+
+/* Phase override modal (customer-facing copy) */
+
+.hlcc-phase-choice .hlcc-btn {
+  width: 100%
+}
+
+
+/* Ensure modal help text is centered and calm */
+#hlcc-phase
+/* iOS-ish modal close target */
+
+
+/* Make phase buttons feel like iOS actions */
+#hlcc-phase .hlcc-btn {
+  letter-spacing: .2px
+}
+
+
+/* v0.2.1 display mode */
+.hlcc-big-text {
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+
+.hlcc-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.hlcc-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.hlcc-radio input {
+  transform: scale(1.1);
+}
+
+
+.hlcc-explain .hlcc-explain .hlcc-explain .hlcc-next .hlcc-next .hlcc-next .hlcc-ring-early .hlcc-ring-near .hlcc-ring-ready .hlcc-whyline {
+  margin: 10px 0 12px 0;
+}
+
+/*
+ * 「为什么这样护理」展开内容容器
+ * 仅在客户点击提示条时显示，用于解释当前护理方案的系统判断。
+ * 内容来源于 JS 渲染（按 day / 阶段拼接），这里只负责折叠动效与留白。
+ */
+.hlcc-why-details {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, .06);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .05);
+  overflow: hidden;
+}
+
+/*
+ * 「为什么这样护理」一行提示条（折叠状态）
+ *
+ * - 设计为极窄的一条提示，让客户知道系统有一个解释，但不强行占太多空间。
+ * - 点击后展开下方 .hlcc-why-details，展示系统判断逻辑的详细说明。
+ *
+ * 注意：这条提示条的高度已经根据 GINO 的反馈缩减过，
+ *       再改厚度/字号时，建议同步查看手机端观感。
+ */
+.hlcc-why-summaryline {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  line-height: 1.1;
+}
+
+.hlcc-why-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-why-title {
+  font-size: 9px;
+  font-weight: 600;
+  color: #111;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.hlcc-why-text {
+  font-size: 9px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+.hlcc-why-chevron {
+  font-size: 18px;
+  line-height: 1;
+  color: #999;
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+}
+
+.hlcc-why-body {
+  padding: 10px 12px 12px 12px;
+  border-top: 1px solid rgba(0, 0, 0, .06);
+}
+
+.hlcc-why-main {
+  font-size: 13px;
+  color: #111;
+  margin-bottom: 6px;
+}
+
+.hlcc-why-extra {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Keep it compact on very small screens */
+@media (max-width:390px) {
+  .hlcc-why-summaryline {
+    padding: 9px 10px;
+  }
+
+  .hlcc-why-title,
+  .hlcc-why-text {
+    font-size: 9px;
+  }
+}
+
+
+/* =========================================
+   v0.2.2 UI polish (iOS-like, clean, low-noise)
+   Safe overrides only (no logic changes)
+   ========================================= */
+
+.hlcc-wrap {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #0f172a;
+}
+
+.hlcc-card {
+  border: 1px solid rgba(17, 24, 39, .08);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .06);
+  border-radius: 16px;
+  padding: 8px 12px;
+  margin: 12px 0;
+}
+
+.hlcc-card-outline {
+  border-color: rgba(37, 99, 235, .55);
+}
+
+.hlcc-section-title {
+  font-size: 16px;
+  letter-spacing: .2px;
+}
+
+.hlcc-btn {
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.hlcc-btn-secondary {
+  background: rgba(17, 24, 39, .04);
+  color: #0f172a;
+  border: 1px solid rgba(17, 24, 39, .08);
+}
+
+.hlcc-btn-tertiary {
+  background: transparent;
+  border: 1px solid rgba(17, 24, 39, .10);
+  color: #0f172a;
+}
+
+.hlcc-btn-sm {
+  border-radius: 11px;
+  padding: 7px 11px;
+  font-size: 13px;
+}
+
+/* "为什么这样护理" — one-line compact, iOS-style hint bar */
+
+.hlcc-why-details {
+  background: rgba(17, 24, 39, .03);
+  border: 1px solid rgba(17, 24, 39, .08);
+  border-radius: 14px;
+  padding: 9px 12px;
+}
+
+.hlcc-why-summaryline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.hlcc-why-summaryline::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-why-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(17, 24, 39, .72);
+  white-space: nowrap;
+}
+
+.hlcc-why-text {
+  font-size: 12px;
+  color: rgba(17, 24, 39, .78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.hlcc-why-chevron {
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(17, 24, 39, .55);
+}
+
+/* Expanded content */
+
+
+/* Footer */
+.hlcc-footer {
+  margin-top: 18px;
+  text-align: center;
+  color: rgba(17, 24, 39, .55);
+}
+
+/* 小屏幕响应式 */
+@media (max-width:420px) {
+  .hlcc-wrap {
+    padding: 0 12px;
+  }
+
+  .hlcc-card {
+    padding: 8px 12px;
+  }
+}
+
+
+:root {
+  --hlcc-bg-warm: #fff7ed;
+  --hlcc-bg-secondary: #f1f5f9;
+  --hlcc-card: #ffffff;
+  --hlcc-border: #e7e5e4;
+  --hlcc-text: #0f172a;
+  --hlcc-text-muted: #64748b;
+  --hlcc-sub: #78716c;
+  --hlcc-accent: #3b82f6;
+  --hlcc-accent-soft: #dbeafe;
+  --hlcc-success: #22c55e;
+  --hlcc-warning: #f59e0b;
+}
+
+body .hlcc-wrap {
+  background: transparent;
+}
+
+body {
+  background: var(--hlcc-bg-warm);
+}
+
+.hlcc-card,
+.hlcc-panel,
+.hlcc-section {
+  border-color: var(--hlcc-border) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04) !important;
+}
+
+.hlcc-title,
+.hlcc-h1,
+.hlcc-brand {
+  letter-spacing: .2px;
+}
+
+.hlcc-muted,
+.hlcc-sub,
+
+.hlcc-btn-primary:active {
+  transform: translateY(1px);
+}
+
+.hlcc-btn-secondary {
+  background: var(--hlcc-accent-soft) !important;
+  border-color: #bfdbfe !important;
+  color: #1e3a8a !important;
+}
+
+.hlcc-pill,
+
+
+:root {
+  --hlcc-bg: #f9fafb;
+  --hlcc-card: #ffffff;
+  --hlcc-border: #e5e7eb;
+  --hlcc-text: #0f172a;
+  --hlcc-sub: #64748b;
+  --hlcc-accent: #3b82f6;
+  --hlcc-accent-soft: #eef2ff;
+  --hlcc-success: #22c55e;
+}
+
+body {
+  background: var(--hlcc-bg) !important;
+}
+
+.hlcc-fab-btn-more .hlcc-fab-icon {
+  /* background-color: #ffffff !important; REMOVED v8.3.33 */
+  background: transparent !important;
+  /* Use white for the + icon */
+  opacity: 1;
+}
+
+.hlcc-card,
+.hlcc-panel,
+.hlcc-section {
+  background: var(--hlcc-card) !important;
+  border-color: var(--hlcc-border) !important;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04) !important;
+}
+
+.hlcc-tipbar,
+.hlcc-why {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.hlcc-btn-secondary {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #1e3a8a !important;
+}
+
+
+:root {
+  --hlcc-radius-card: 16px;
+  --hlcc-radius-btn: 12px;
+  --hlcc-pad-card: 16px;
+  --hlcc-gap: 12px;
+}
+
+.hlcc-card,
+.hlcc-panel,
+.hlcc-section {
+  border-radius: var(--hlcc-radius-card) !important;
+}
+
+.hlcc-card-inner,
+.hlcc-card__inner,
+.hlcc-wrap,
+.hlcc-title,
+.hlcc-subtitle,
+.hlcc-h2 {
+  font-weight: 600 !important;
+}
+
+.hlcc-body,
+.hlcc-text,
+.hlcc-caption,
+.hlcc-muted {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.hlcc-divider,
+hr {
+  border-color: rgba(226, 232, 240, .9) !important;
+}
+
+.hlcc-btn,
+button.hlcc-btn-primary,
+button.hlcc-btn-secondary,
+a.hlcc-btn-primary,
+a.hlcc-btn-secondary {
+  border-radius: var(--hlcc-radius-btn) !important;
+  min-height: 44px !important;
+}
+
+.hlcc-btn-primary:active {
+  filter: saturate(.95);
+}
+
+.hlcc-btn-secondary {
+  box-shadow: 0 6px 12px rgba(30, 58, 138, .06) !important;
+}
+
+.hlcc-tipbar,
+.hlcc-why {
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  background: linear-gradient(180deg, #f1f5f9 0%, #eef2ff 100%) !important;
+}
+
+.hlcc-tipbar .hlcc-tipbar__title,
+.hlcc-why .hlcc-tipbar .hlcc-tipbar__text,
+.hlcc-why:root {
+  --hlcc-radius-card: 16px;
+  --hlcc-radius-btn: 12px;
+  --hlcc-radius-sheet: 22px;
+}
+
+/* overall typography a bit smaller and more refined */
+.hlcc-title,
+.hlcc-body,
+.hlcc-text,
+.hlcc-caption,
+.hlcc-muted {
+  font-size: 11px !important;
+}
+
+/* Why-care tipbar: about half the height */
+.hlcc-tipbar,
+.hlcc-why {
+  padding: 6px 10px !important;
+  border-radius: 12px !important;
+}
+
+.hlcc-tipbar .hlcc-tipbar__title,
+.hlcc-why .hlcc-tipbar .hlcc-tipbar__text,
+.hlcc-why
+
+/* 1) 为什么这样护理：提示条整体高度减半（只调 padding，不改文案与结构） */
+.hlcc-why-summaryline {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+/* 2) 账号设置「我的疗程」视觉修正 */
+.hlcc-section {
+  margin-top: 18px;
+  padding-top: 0;
+  /* 移除大号内边距，避免形成大白框 */
+  border-top: 1px solid #eef2f7;
+  /* 仅保留一条分隔线 */
+}
+
+/* 标题增加左右边距，使「我的疗程」不贴边 */
+.hlcc-section-title {
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  padding: 0 2px;
+}
+
+/* 疗程卡片与新增疗程与标题之间增加呼吸位，避免边框重合、延伸到底部 */
+.hlcc-course-add {
+  margin-top: 14px;
+}
+
+#hlcc-tutorial #hlcc-tutorial
+
+/* 2) 账号设置「我的疗程」：去掉整块白色背景框，仅保留简单分隔 */
+.hlcc-section {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  margin-top: 18px;
+  padding: 0;
+}
+
+/* 保留轻微顶部分隔线（不包住整个块） */
+.hlcc-section+.hlcc-section {
+  border-top: 1px solid #eef2f7;
+  padding-top: 12px;
+}
+
+/* 标题与下方项目左对齐，取消额外白底，只做文字分组 */
+.hlcc-section-title {
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  padding: 0;
+}
+
+#hlcc-tutorial #hlcc-tutorial #hlcc-tutorial .hlcc-muted #hlcc-tutorial .hlcc-muted
+/* ------------------------------------------------------------
+ * v2.0: 主页主卡片 iOS 风格增强（0006c3 → 0006c3-v2-css）
+ * 说明：
+ *  - 基于 v0.2.2_build-0006c3（仅注释增强）进行「视觉升级」
+ *  - 不改动 HTML 结构与 JS 逻辑，仅通过 CSS 调整两张主卡片样式：
+ *      1）「已进行」卡片：.hlcc-card.hlcc-card-outline
+ *      2）「今日护理」卡片：.hlcc-card.hlcc-today
+ *  - 兼容移动端优先布局，桌面端仅自然放大。
+ * ---------------------------------------------------------- */
+
+/* 通用：主卡片基础升级（在 .hlcc-card 之上再柔化一层） */
+.hlcc-card.hlcc-card-outline,
+.hlcc-card.hlcc-today {
+  border-radius: 20px;
+  border-color: rgba(15, 23, 42, .06);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, .07);
+  padding: 18px 18px 20px;
+}
+
+/* 为了避免所有卡片都太“浮”，只对首页两张主卡片做浅色背景渐变 */
+.hlcc-card.hlcc-card-outline {
+  /* 轻微冷色渐变，模拟健康 App 卡片质感 */
+  background:
+    radial-gradient(circle at 0% 0%, rgba(191, 219, 254, .55), transparent 55%),
+    radial-gradient(circle at 100% 0%, rgba(221, 214, 254, .45), transparent 55%),
+    #ffffff;
+}
+
+.hlcc-card.hlcc-today {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(248, 250, 252, .8), transparent 60%),
+    #ffffff;
+}
+
+/* ------------------------------------------------------------
+ * 「已进行」主卡片：顶部信息与进度区块
+ * ---------------------------------------------------------- */
+
+/* 顶部「已进行 + 项目标签 + 备注标签」一行更 iOS 化 */
+.hlcc-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  letter-spacing: .02em;
+}
+
+/* 项目 pill：颜色稍微更柔和一点 */
+.hlcc-pill.hlcc-pill-project {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+/* 如果有备注 pill，尽量保持统一风格（若未来有 .hlcc-pill-note 类，可一起覆写） */
+.hlcc-pill-note {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* 左侧主信息区：天数 / 状态文案 */
+.hlcc-card-outline .hlcc-big,
+.hlcc-card-outline .hlcc-big-text {
+  margin-top: 10px;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: .01em;
+}
+
+.hlcc-card-outline .hlcc-big-unit {
+  font-size: 16px;
+}
+
+/* 操作日期行：弱化一点，让重点留给状态 */
+.hlcc-card-outline .hlcc-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* 右侧进度信息块整体像一张“次级信息卡” */
+.hlcc-card-outline .hlcc-right {
+  min-width: 180px;
+  text-align: right;
+}
+
+/* 右侧标题 + 强调数字 */
+.hlcc-card-outline .hlcc-muted {
+  font-size: 12px;
+}
+
+.hlcc-card-outline .hlcc-strong {
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+/* 进度条：更细、更圆、更接近 iOS */
+.hlcc-progress {
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.hlcc-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+}
+
+/* 进度条下方提示：字体稍小一点 */
+.hlcc-card-outline .hlcc-meta:last-child {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------
+ * 「今日护理」主卡片：标题栏 + 状态 + 正文 + 鼓励语
+ * ---------------------------------------------------------- */
+
+/* 标题栏像小导航条：左标题 + 副标题，右侧胶囊按钮 */
+.hlcc-today .hlcc-titlebar {
+  margin-bottom: 4px;
+}
+
+/* 小屏幕时让右侧按钮自动换行，避免挤压标题 */
+
+/* 今日护理主标题 */
+.hlcc-today .hlcc-h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  margin: 0;
+}
+
+/* 恢复第 X 天 副标题 */
+.hlcc-today
+
+/* 标题栏里的按钮统一做成胶囊按钮，并确保文字垂直居中 */
+.hlcc-today .hlcc-btn.hlcc-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1;
+  height: auto;
+}
+
+/* 让按钮整体靠右排列，并保持按钮之间的间距 */
+.hlcc-today .hlcc-titlebar a.hlcc-btn.hlcc-btn-sm:first-of-type {
+  margin-left: auto;
+}
+
+.hlcc-today .hlcc-titlebar a.hlcc-btn.hlcc-btn-sm+a.hlcc-btn.hlcc-btn-sm {
+  margin-left: 6px;
+}
+
+/* 主按钮：换药教程 */
+.hlcc-today a.hlcc-btn.hlcc-btn-sm[href="#hlcc-tutorial"] {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+/* 次按钮：当前状态（描边按钮） */
+.hlcc-today a.hlcc-btn.hlcc-btn-sm.ghost[href="#hlcc-phase"] {
+  background: transparent;
+  border-color: #e5e7eb;
+  color: #0f172a;
+}
+
+/* 悬停/按下状态：轻微加强，不夸张 */
+.hlcc-today a.hlcc-btn.hlcc-btn-sm:hover {
+  opacity: .96;
+}
+
+/* 状态 meta：将 status_tag 做成小徽章 */
+.hlcc-phase-meta {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* 如果未来这里加上 base_phase 等信息，可以放在右侧 */
+.hlcc-phase-meta .hlcc-meta {
+  margin-top: 0;
+  font-size: 9px;
+  color: #6b7280;
+}
+
+/* 今日护理标题（care['title']）更像内容标题 */
+.hlcc-today .hlcc-title-rich {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* 正文：行距稍加大一点，阅读更轻松 */
+.hlcc-today .hlcc-body {
+  margin-top: 8px;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+/* 今日要点列表：与正文保持一致节奏 */
+.hlcc-today .hlcc-section {
+  margin-top: 10px;
+}
+
+/* 今日禁忌：保持块状高亮，移除单侧红色竖条，避免“只做一边”的违和感 */
+.hlcc-today .hlcc-taboo {
+  margin-top: 12px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: #fef2f2;
+}
+
+.hlcc-today .hlcc-taboo-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.hlcc-today .hlcc-taboo-body {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* 鼓励语：更像一条温柔的提示气泡 */
+.hlcc-encourage {
+  margin-top: 14px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  background: #f5f7ff;
+  border: 1px solid rgba(129, 140, 248, .18);
+  color: #1f2933;
+  font-weight: 500;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* 今日护理底部备注（footer_note），与鼓励语保持间距 */
+.hlcc-today .hlcc-footer-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ------------------------------------------------------------
+ * 微动效：卡片按下反馈（尊重 prefers-reduced-motion）
+ * ---------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+
+  .hlcc-card.hlcc-card-outline:active,
+  .hlcc-card.hlcc-today:active {
+    transform: translateY(1px) scale(.995);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .08);
+  }
+}
+
+
+/* v2.0-fix: 居中对齐“当前状态：…（系统判断）” */
+.hlcc-today .hlcc-phase-meta {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+
+/* ------------------------------------------------------------
+ * v2.1: 主页其他卡片 iOS 化修正
+ * 目标：
+ *  - 统一「为什么这样护理」提示条 + 展开卡片的观感，与两张主卡片风格更接近
+ *  - 保持紧凑、不喧宾夺主，仅做柔和、专业感增强
+ *  - 不改 HTML 结构与交互逻辑
+ * ---------------------------------------------------------- */
+
+/* 外层容器与卡片背景：更接近小号信息卡的感觉 */
+
+
+.hlcc-why-details {
+  background: rgba(248, 250, 252, .96);
+  border: 1px solid rgba(148, 163, 184, .36);
+  border-radius: 18px;
+  padding: 8px 10px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, .06);
+  overflow: hidden;
+}
+
+/* 折叠提示条：更像一条系统提示，而不是普通列表项 */
+.hlcc-why-summaryline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Reduced from 10px */
+  list-style: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  /* Tighter padding */
+}
+
+/* 标题：「为什么这样护理」四个字更清晰、偏系统风格 */
+.hlcc-why-title {
+  font-size: 8px;
+  /* Balanced size */
+  font-weight: 700;
+  /* Bold */
+  letter-spacing: .01em;
+  color: rgba(15, 23, 42, .92);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* 摘要内容：保持单行省略，颜色略淡一些 */
+.hlcc-why-text {
+  font-size: 8px;
+  /* Balanced size */
+  font-weight: 700;
+  /* Bold */
+  color: rgba(100, 116, 139, .96);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+
+/* 右侧小箭头：比原来稍微轻一点 */
+.hlcc-why-chevron {
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(148, 163, 184, .95);
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+}
+
+/* 展开内容区：顶部细分隔线 + 更舒适的行距 */
+.hlcc-why-body,
+
+
+/* 主解释文案 */
+.hlcc-why-main {
+  font-size: 13px;
+  color: rgba(30, 41, 59, .96);
+  line-height: 1.55;
+  margin-bottom: 4px;
+}
+
+/* 补充说明文案 */
+.hlcc-why-extra {
+  font-size: 12px;
+  color: rgba(100, 116, 139, .98);
+  line-height: 1.5;
+}
+
+/* 小屏幕上整体再紧凑一点 */
+@media (max-width:390px) {
+  .hlcc-why-summaryline {
+    padding: 5px 2px;
+    gap: 8px;
+  }
+
+  .hlcc-why-title,
+  .hlcc-why-text {
+    font-size: 9px;
+  }
+}
+
+/* Footer: 与新版卡片风格一致，稍微增加字距与层次 */
+.hlcc-footer {
+  margin-top: 20px;
+  text-align: center;
+  color: rgba(148, 163, 184, .95);
+}
+
+.hlcc-footer .hlcc-footer
+/* ------------------------------------------------------------
+ * v2.2: 账号设置页（我的疗程 / 新增疗程）视觉统一 iOS 风
+ * 目标：
+ *  - 让「我的疗程」每一条疗程条目更像独立卡片，信息层次更清晰
+ *  - 「新增疗程」表单与首页卡片风格统一：圆角、留白、边框、字体
+ *  - 完全 CSS 级别调整，不改动任何 HTML / JS 逻辑
+ * ---------------------------------------------------------- */
+
+/* ============== 「我的疗程」列表 ============== */
+
+/* 单个疗程条目卡片 */
+/* 行布局：左侧信息 + 右侧按钮 */
+
+
+/* 左侧主信息区 */
+
+
+/* 疗程名称：更像标题 */
+.hlcc-course-name {
+  font-weight: 800;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+/* 迷你信息：日期 / 下次清洗 / 状态 等 */
+
+
+.hlcc-mini {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+/* 当前疗程标记：用更明显的蓝色徽章 */
+.hlcc-mini-current {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* 右侧按钮纵向排列（桌面），移动端再横排 */
+
+
+/* 账号设置页中的按钮统一胶囊化 */
+.hlcc-course-buttons .hlcc-btn {
+  border-radius: 999px;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+/* 危险操作按钮（删除疗程） */
+.hlcc-course-buttons .hlcc-btn-danger {
+  border-color: #ef4444;
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* 文本型按钮（展开详情、设为当前等）可以使用 ghost 风格 */
+.hlcc-course-buttons .hlcc-btn.ghost {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, .6);
+  color: #0f172a;
+}
+
+/* 详情说明内文 */
+.hlcc-course-details {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* 折叠标题「查看详情」 */
+.hlcc-course-summary {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 600;
+  list-style: none;
+}
+
+.hlcc-course-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 移动端：按钮横排、更易点击 */
+@media (max-width:560px) {
+
+
+  .hlcc-course-buttons form {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* ============== 「新增疗程」表单区域 ============== */
+
+/* 与列表卡片之间保留间距 */
+.hlcc-course-add {
+  margin-top: 16px;
+}
+
+/* 下拉选择等通用选择框 */
+.hlcc-select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid rgba(148, 163, 184, .7);
+  border-radius: 14px;
+  font-size: 15px;
+  background: #ffffff;
+}
+
+/* 通用表单字段容器 */
+.hlcc-field {
+  display: block;
+  margin-top: 12px;
+}
+
+/* 字段标题标签 */
+.hlcc-field span {
+  display: block;
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+/* 输入框：与选择框统一风格 */
+.hlcc-field input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(148, 163, 184, .7);
+  border-radius: 14px;
+  font-size: 15px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+/* 日期输入保持宽度自适应 */
+.hlcc-field input[type="date"] {
+  max-width: 100%;
+}
+
+/* 行内字段：保持对齐 */
+.hlcc-field-inline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* 「保存 / 新增」等主按钮 */
+.hlcc-course-add .hlcc-btn {
+  margin-top: 14px;
+  width: 100%;
+  border-radius: 999px;
+  font-size: 15px;
+  padding: 10px 14px;
+}
+
+/* ============== 细节动效：卡片按下反馈 ============== */
+@media (prefers-reduced-motion: no-preference) {
+  .hlcc-course-item {
+    border: none;
+    border-radius: 0;
+    padding: 8px 0;
+    margin-bottom: 8px;
+  }
+
+  .hlcc-course-item:active {
+    transform: translateY(1px) scale(.997);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, .07);
+  }
+}
+
+/* 标题与副标题 */
+
+
+/* 关闭按钮：圆形 icon 按钮 */
+
+
+/* 通用说明文字 */
+
+
+/* 换药步骤列表：标题更明显、正文更舒适 */
+
+
+.hlcc-step:last-child {
+  border-bottom: none;
+}
+
+
+.hlcc-step .hlcc-body {
+  margin: 0 auto;
+  max-width: 520px;
+}
+
+/* 视频链接区域 */
+.hlcc-video {
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* 当前状态底部按钮组更紧凑 */
+
+
+/* 顶部拖拽条区域（若有）可稍微压低高度，不干扰标题 */
+
+
+/* 小屏幕上的弹窗内边距略收紧一点 */
+
+/* ------------------------------------------------------------
+ * v2.0.5_build-0205p1: 交互状态统一（按钮 / 链接 hover & focus）
+ * 目标：
+ *  - 统一所有 .hlcc-btn / .hlcc-link 的 hover / active / focus-visible 体验
+ *  - 在不破坏既有布局的前提下，增加轻量可见的键盘焦点样式
+ * ---------------------------------------------------------- */
+
+/* 主按钮与描边按钮的 hover/active 状态统一 */
+.hlcc-btn:hover {
+  filter: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .16);
+  transform: translateY(-0.5px);
+}
+
+.hlcc-btn:active {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, .18);
+  transform: translateY(0);
+}
+
+/* ghost 按钮 hover 时仅做轻量填充，不改变文字色太多 */
+.hlcc-btn.ghost:hover {
+  background: rgba(37, 99, 235, .06);
+}
+
+/* 危险按钮 hover 稍微加深 */
+.hlcc-btn-danger:hover {
+  filter: brightness(.96);
+}
+
+/* 链接统一 hover（不影响之前局部样式） */
+.hlcc-link:hover {
+  text-decoration: underline;
+  opacity: .9;
+}
+
+/* 键盘焦点可视化：统一使用柔和蓝色描边 + 轻微光晕 */
+.hlcc-btn:focus-visible,
+.hlcc-link:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, .9),
+    0 0 0 4px rgba(191, 219, 254, .9);
+}
+
+/* 避免某些已定义强烈阴影的卡片在键盘焦点时过于夸张 */
+.hlcc-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, .8), 0 0 0 4px rgba(191, 219, 254, .9);
+}
+
+
+/* ------------------------------------------------------------
+ * v2.0.6_build-0206p1: 阶段视觉系统 v2（炎症 / 结痂 / 康复）
+ * 目标：
+ *  - 为 3 个阶段建立一套统一的「颜色 + 小徽章 + 小图标」体系
+ *  - 不改动 HTML 结构，在现有元素上通过 class / 伪元素实现
+ *  - 兼容旧用法：没有阶段 class 时，仍然使用中性样式
+ * ---------------------------------------------------------- */
+
+/* ========== 1. 阶段小徽章（用于「当前状态」等位置） ========== */
+
+/*
+ * 基础徽章样式：
+ * - 默认中性灰色（当没有绑定具体阶段时）
+ * - 通过附加 class 控制具体阶段的色彩
+ *
+ * 建议在 HTML 中按需添加以下修饰类：
+ *  - .hlcc-status--inflammation   对应「炎症期」
+ *  - .hlcc-status--scab           对应「结痂期 / 掉痂期」
+ *  - .hlcc-status--recovery       对应「康复期」
+ */
+
+
+/* 左侧小圆点图标（跟随文字颜色变化） */
+.hlcc-status-tag::before {
+  content: "";
+  display: inline-block;
+  margin-right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .85;
+}
+
+/* —— 阶段色板 —— */
+
+/* 炎症期：温和橙红，提示注意但不过度惊吓 */
+.hlcc-status-tag
+/* 结痂期 / 掉痂期：偏琥珀色，表示「修复进行中」 */
+.hlcc-status-tag
+/* 康复期：柔和绿色，表达「恢复良好」 */
+.hlcc-status-tag
+/* ========== 2. 阶段选择按钮（当前状态弹窗 #hlcc-phase） ========== */
+
+/*
+ * 若 HTML 没有阶段 class，这里通过 nth-child 为 3 个选项提供默认配色：
+ *  - 第 1 个：炎症期
+ *  - 第 2 个：结痂期 / 掉痂期
+ *  - 第 3 个：康复期
+ *
+ * 若未来在按钮上添加类似
+ *  .hlcc-phase-btn--inflammation / --scab / --recovery
+ *  也可以在下面继续扩展。
+ */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(1) .hlcc-btn {
+  background: rgba(248, 113, 113, .09);
+  border-color: rgba(248, 113, 113, .7);
+  color: #b91c1c;
+}
+
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(2) .hlcc-btn {
+  background: rgba(245, 158, 11, .08);
+  border-color: rgba(245, 158, 11, .75);
+  color: #92400e;
+}
+
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(3) .hlcc-btn {
+  background: rgba(34, 197, 94, .08);
+  border-color: rgba(34, 197, 94, .75);
+  color: #166534;
+}
+
+/* 悬停时稍微加深一点，保持轻量反馈 */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice .hlcc-btn:hover {
+  filter: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .1);
+}
+
+/* ========== 3. 阶段小图标体系（不改结构，通过伪元素实现） ========== */
+
+/*
+ * 用于阶段按钮中的小图标（当前状态弹窗）
+ * 假设按钮内结构类似：
+ *  <button class="hlcc-btn">炎症期 · 建议冷敷</button>
+ *
+ * 通过 ::before 在文字左侧加一个小图标容器，图标形状用纯 CSS 表达：
+ *  - 炎症期：小火焰 / 滴状感（用旋转方块 + 圆点）
+ *  - 结痂期：方块 + 线条，表达「修复中」
+ *  - 康复期：勾勾 / 叶子形状（圆角 + 斜线）
+ */
+
+/* 基础 icon 占位 */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice .hlcc-btn::before {
+  content: "";
+  display: inline-block;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  position: relative;
+}
+
+/* 炎症期 icon（小火焰感） */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(1) .hlcc-btn::before {
+  background: rgba(254, 226, 226, .95);
+}
+
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(1) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 6px;
+  height: 9px;
+  border-radius: 6px 6px 10px 10px;
+  background: linear-gradient(180deg, #fb923c, #b91c1c);
+}
+
+/* 结痂期 icon（修复中的小贴片感） */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(2) .hlcc-btn::before {
+  background: rgba(254, 243, 199, .96);
+}
+
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(2) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  width: 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #facc15, #92400e);
+}
+
+/* 康复期 icon（小勾勾 / 叶子感） */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(3) .hlcc-btn::before {
+  background: rgba(220, 252, 231, .96);
+}
+
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice:nth-child(3) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #16a34a;
+  border-top-color: transparent;
+  border-left-color: transparent;
+  transform: rotate(35deg);
+}
+
+/* 小屏幕上，保证 icon 与文字不会挤压换行太难看 */
+@media (max-width:390px) {
+  #hlcc-phase .hlcc-phase-choices .hlcc-phase-choice .hlcc-btn {
+    align-items: flex-start;
+  }
+}
+
+
+/* ------------------------------------------------------------
+ * v2.0.7_build-0207p1: 动效增强（卡片 / 弹窗 / 阶段徽章）
+ * 目标：
+ *  - 为首页主卡片、弹窗、阶段选择等增加轻量动效
+ *  - 尊重 prefers-reduced-motion：仅在用户允许时启用
+ *  - 风格：柔和、短暂、不过度分散注意力
+ * ---------------------------------------------------------- */
+
+/* 「为什么这样护理」展开时：内容轻微淡入上浮 */
+details[open] .hlcc-why-body {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 当前状态弹窗内的阶段按钮：hover 时图标轻微上浮 */
+#hlcc-phase .hlcc-phase-choices .hlcc-phase-choice .hlcc-btn:hover::before {
+  transform: translateY(-1px);
+}
+
+
+/* ------------------------------------------------------------
+ * v2.0.8_build-0208p1: 阶段图标兼容修正
+ * 说明：
+ *  - 原先的阶段按钮样式依赖 .hlcc-phase-choice 容器 + nth-child
+ *  - 若前台 HTML 中仅有 .hlcc-phase-choices 内部直接输出按钮/表单，将无法命中
+ *  - 这里通过「直接针对容器的第 N 个子元素」的写法增强兼容，不要求 .hlcc-phase-choice 存在
+ * ---------------------------------------------------------- */
+
+/* 阶段按钮色板：直接基于 .hlcc-phase-choices 的第 N 个子元素 */
+#hlcc-phase .hlcc-phase-choices>*:nth-child(1) .hlcc-btn {
+  background: rgba(248, 113, 113, .09);
+  border-color: rgba(248, 113, 113, .7);
+  color: #b91c1c;
+}
+
+#hlcc-phase .hlcc-phase-choices>*:nth-child(2) .hlcc-btn {
+  background: rgba(245, 158, 11, .08);
+  border-color: rgba(245, 158, 11, .75);
+  color: #92400e;
+}
+
+#hlcc-phase .hlcc-phase-choices>*:nth-child(3) .hlcc-btn {
+  background: rgba(34, 197, 94, .08);
+  border-color: rgba(34, 197, 94, .75);
+  color: #166534;
+}
+
+/* 图标基础占位（避免旧选择器不命中的情况） */
+#hlcc-phase .hlcc-phase-choices>* .hlcc-btn::before {
+  content: "";
+  display: inline-block;
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  position: relative;
+}
+
+/* 炎症期 icon（第 1 个） */
+#hlcc-phase .hlcc-phase-choices>*:nth-child(1) .hlcc-btn::before {
+  background: rgba(254, 226, 226, .95);
+}
+
+#hlcc-phase .hlcc-phase-choices>*:nth-child(1) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  width: 6px;
+  height: 9px;
+  border-radius: 6px 6px 10px 10px;
+  background: linear-gradient(180deg, #fb923c, #b91c1c);
+}
+
+/* 结痂期 icon（第 2 个） */
+#hlcc-phase .hlcc-phase-choices>*:nth-child(2) .hlcc-btn::before {
+  background: rgba(254, 243, 199, .96);
+}
+
+#hlcc-phase .hlcc-phase-choices>*:nth-child(2) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 5px;
+  width: 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #facc15, #92400e);
+}
+
+/* 康复期 icon（第 3 个） */
+#hlcc-phase .hlcc-phase-choices>*:nth-child(3) .hlcc-btn::before {
+  background: rgba(220, 252, 231, .96);
+}
+
+#hlcc-phase .hlcc-phase-choices>*:nth-child(3) .hlcc-btn::before::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #16a34a;
+  border-top-color: transparent;
+  border-left-color: transparent;
+  transform: rotate(35deg);
+}
+
+
+/* ------------------------------------------------------------
+ * v2.0.9_build-0209p1: 当前状态弹窗动效优化
+ * 说明：
+ *  - 避免 #hlcc-phase 弹窗承载中心弹窗的缩放 / 平移动画，减少「卡顿 + 左滑」感
+ *  - 保留底部 sheet 自身的上滑动画（hlcc-sheet-rise）
+ *  - 修正关闭按钮在部分设备点击区域错位的问题
+ * ---------------------------------------------------------- */
+
+
+
+
+/* ------------------------------------------------------------
+ * v2.0.11_build-0211p1: 弹窗动效安全模式
+ * 说明：
+ *  - 根据「稳定优先」原则，完全关闭两个弹窗的 transform 动画
+ *  - 保留卡片、徽章等非关键交互区域的动效
+ *  - 目标是彻底消除：当前状态弹窗左滑、换药教程弹窗位置异常 等问题
+ * ---------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {}
+
+/* iOS Safari 点击关闭按钮时的圆形高亮去除，并统一焦点表现 */
+
+
+/* 最后一个步骤在底部多留一点空间 */
+#hlcc-tutorial .hlcc-step:last-child {
+  padding-bottom: 20px;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+/* 视频按钮区域在教程中额外留出下边距，避免被圆角或白边压住 */
+#hlcc-tutorial .hlcc-step .hlcc-video {
+  margin-bottom: 10px;
+}
+
+/* 步骤列表下边距优化：最后一块有呼吸空间 */
+#hlcc-tutorial #hlcc-tutorial .hlcc-step:last-child {
+  border-bottom: none;
+  padding-bottom: 24px;
+}
+
+/* 视频区域与底部留出空间，避免贴边 */
+#hlcc-tutorial .hlcc-step .hlcc-video {
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+/* sheet 内部的头部与正文 */
+#hlcc-phase
+/* 小屏幕上允许 sheet 稍宽一点，仍保持贴底 */
+
+
+/* 标题后的副标题与提示语保持适度间距 */
+#hlcc-tutorial #hlcc-tutorial .hlcc-muted
+
+/* 步骤区域在全屏布局下稍微收紧间距，避免视觉过满 */
+#hlcc-tutorial #hlcc-tutorial #hlcc-tutorial .hlcc-step:last-child {
+  border-bottom: none;
+  padding-bottom: 24px;
+}
+
+/* 视频按钮与底部留足缓冲空间，防止「被夹住」的错觉 */
+#hlcc-tutorial .hlcc-step .hlcc-video {
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+
+/* 头部在 bottom sheet 内固定在顶部 */
+#hlcc-phase
+/* 小屏幕下，bottom sheet 填满宽度 */
+
+
+/* 步骤容器：在标题下方滚动，保证长内容可用 */
+#hlcc-tutorial
+
+/* 步骤间距略收紧，最后一步留出安全空间 */
+#hlcc-tutorial #hlcc-tutorial .hlcc-step:last-child {
+  border-bottom: none;
+  padding-bottom: 24px;
+}
+
+/* 视频按钮区域下方留出呼吸空间，避免被视觉边界“夹住” */
+#hlcc-tutorial .hlcc-step .hlcc-video {
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+
+/* 头部固定于 sheet 顶部，内部左右留白适度 */
+#hlcc-phase
+/* 小屏幕下：bottom sheet 填满宽度 */
+
+
+/* ========== 3. 弹窗动效 v3：温和且可控 ========== */
+
+@media (prefers-reduced-motion: no-preference) {}
+
+
+
+
+/* 所有 .hlcc-btn：轻微按压反馈（不影响布局，仅作用于自身） */
+.hlcc-btn {}
+
+.hlcc-btn:active {
+  transform: scale(.97);
+  box-shadow: 0 0 0 rgba(15, 23, 42, .08);
+}
+
+
+/* ============================================================
+ * 行楽前台 UI v3 —— 全新前端架构（保持逻辑不变，只重写前台表现）
+ * Version: v7.2.0 (Plugin v7.2.0)
+ * 基础原则：
+ *   - App Frame：移动端优先的「应用壳」
+ *   - Section 化：已进行 / 今日护理 / 账号 设置为独立模块
+ *   - Modal v3：Tutorial 视为整屏页面，Phase 为贴底 bottom sheet
+ *   - 动效：温和、有反馈、受 prefers-reduced-motion 控制
+ * ========================================================== */
+
+/* ========== 0. App Frame & 全局重置（在 hlcc-wrap 内部生效） ========== */
+
+.hlcc-wrap {
+  background: #f5f7fb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 12px 12px 20px;
+}
+
+/* 主容器：限制宽度，让前台更像 App */
+#hlcc-root {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* 全局标题、文本统一风格 */
+#hlcc-root,
+#hlcc-root * {
+  box-sizing: border-box;
+}
+
+/* 顶部品牌区（保持你原来的结构，统一视觉） */
+.hlcc-topbar {
+  padding: 8px 4px 4px;
+  margin-bottom: 10px;
+}
+
+.hlcc-brand-line1 {
+  font-size: 14px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.hlcc-brand-line2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 2px;
+}
+
+/* Section 通用容器 */
+.hlcc-section {
+  margin-bottom: 14px;
+}
+
+/* 卡片基础样式 v3 */
+.hlcc-card {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+  background: #ffffff;
+  padding: 8px 12px;
+}
+
+/* 今日护理主卡片：略大一点，强调主任务 */
+
+
+/* 卡片标题行 */
+
+
+/* pill 标签 v3 */
+.hlcc-pill {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.hlcc-pill-project {
+  background: rgba(15, 118, 110, .07);
+  color: #0f766e;
+}
+
+.hlcc-pill-note {
+  background: rgba(79, 70, 229, .06);
+  color: #3730a3;
+}
+
+/* 状态徽章：炎症 / 结痂 / 康复 */
+
+
+/* 炎症期 */
+
+.hlcc-badge-phase-inflammation
+/* 结痂期 */
+
+.hlcc-badge-phase-scab
+/* 康复期 */
+
+.hlcc-badge-phase-heal
+/* 「今日禁忌」小提示区域 */
+
+
+/* 「为什么这样护理」折叠内容 */
+
+
+/* 标题 & 副标题 */
+#hlcc-tutorial #hlcc-tutorial
+/* 关闭按钮 */
+#hlcc-tutorial
+/* 步骤区域：内部滚动 */
+#hlcc-tutorial
+
+/* 步骤样式 v3 */
+#hlcc-tutorial #hlcc-tutorial .hlcc-step:last-child {
+  border-bottom: none;
+  padding-bottom: 24px;
+}
+
+#hlcc-tutorial #hlcc-tutorial
+
+/* 视频按钮区 */
+#hlcc-tutorial .hlcc-step .hlcc-video {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+/* 头部 Bar */
+#hlcc-phase
+/* ========== 4. 动效 v3：温柔但有手感 ========== */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 遮罩淡入 */
+
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 按钮按压反馈 */
+.hlcc-btn {}
+
+.hlcc-btn:active {
+  transform: scale(.97);
+  box-shadow: 0 0 0 rgba(15, 23, 42, .08);
+}
+
+/* 小屏：卡片与 bottom sheet 铺满宽度 */
+
+
+/* ========================
+ * v6: 登录后项目滑动条（我的项目横向滚动）
+ * ======================== */
+.hlcc-course-strip-card {
+  margin-bottom: 14px;
+}
+
+.hlcc-course-strip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.hlcc-course-strip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.hlcc-course-strip-sub {
+  font-size: 9px;
+  color: #94a3b8;
+}
+
+.hlcc-course-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 0 -4px 0 0;
+}
+
+.hlcc-course-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.hlcc-course-strip::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, .7);
+  border-radius: 999px;
+}
+
+.hlcc-course-pill {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.hlcc-course-pill-btn {
+  display: block;
+  min-width: 140px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, .04);
+  text-align: left;
+}
+
+.hlcc-course-pill-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.hlcc-course-pill-meta {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.hlcc-course-pill.is-active .hlcc-course-pill-btn {
+  border-color: #0f172a;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #e5e7eb;
+}
+
+.hlcc-course-pill.is-active .hlcc-course-pill-name {
+  color: #e5e7eb;
+}
+
+.hlcc-course-pill.is-active .hlcc-course-pill-meta {
+  color: #cbd5f5;
+}
+
+.hlcc-pill-active {
+  background: rgba(251, 251, 251, .16);
+  color: #fefce8;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* 关闭按钮保持圆形，靠近右上角 */
+#hlcc-tutorial
+/* 打开弹窗时禁止 body 背景滚动，防止底层页面露出缝隙 */
+body
+/* 当前状态底部说明小字靠近底部安全边距 */
+#hlcc-phase
+/* 关闭按钮维持圆形，避免占用多余空间 */
+#hlcc-tutorial
+/* 打开弹窗时彻底锁死 body 滚动，避免下方页面挤出缝隙 */
+body
+/* layout tweaks */
+
+/* Hide the original "换药教程 / 当前状态" small buttons in 今日护理标题栏 */
+.hlcc-today .hlcc-titlebar .hlcc-btn-sm {
+  display: none;
+}
+
+/* Fixed floating buttons container (bottom-right of viewport) */
+
+
+/* Make floating buttons look slightly more prominent */
+
+
+/* Ensure floating buttons never get hidden behind HLCC cards */
+.hlcc-wrap {
+  position: relative;
+  /* Ensure no transform creates a stacking context that breaks fixed positioning */
+  transform: none !important;
+  perspective: none !important;
+  filter: none !important;
+  contain: none !important;
+}
+
+/* Slightly soften modal overlay to look more like a floating window over the page */
+
+
+/* === HLCC custom v7.1: hide course strip, bubble fabs, floating-style modals === */
+/* 1) 隐藏前台“我的项目”整块卡片（DOM 仍在，用于 JS 提交切换项目表单） */
+.hlcc-course-strip-card {
+  display: none;
+}
+
+/* 2) 悬浮按钮：文字在上，圆形按钮在下 */
+
+
+/* 保证 FAB 不被 HLCC 内卡片遮挡 */
+.hlcc-wrap {
+  position: relative;
+}
+
+/* === HLCC custom v7.2: swipe hint, smaller FABs, stronger floating modal look === */
+
+/* 提示文案：当有多个项目时显示 */
+.hlcc-swipe-hint {
+  margin: 6px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* 调小悬浮按钮尺寸与字体 */
+
+
+/* 教程与当前状态遮罩稍微再淡一点，避免“全屏压迫感” */
+#hlcc-tutorial
+/* === HLCC custom v7.3: inner content swipe only & clean floating modals === */
+
+/* 只让内容区参与左右滑动，顶部品牌和账号区域固定不动 */
+.hlcc-main {
+  position: relative;
+  will-change: transform;
+}
+
+/* === HLCC custom v7.5: clean floating modals driven by JS (.is-open) === */
+
+/* 基础：悬浮窗容器，默认隐藏，通过 .is-open 显示 */
+
+
+/* === HLCC custom v7.6: fixed FAB & full-viewport floating modals === */
+
+/* 悬浮按钮始终固定在右下角，独立于卡片布局 */
+
+
+/* Deprecated inline fab group container (no longer used) */
+
+
+/* Global FAB container appended to <body>, fixed to viewport */
+.hlcc-global-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 80px;
+  z-index: 10030;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* === HLCC modal v7.9: single clean floating-window implementation === */
+
+/* Modal root: covers entire viewport, only visible when .is-open */
+
+
+/* Transparent overlay: full-screen click area, no blur, no tint */
+
+
+/* Floating card (教程 & 当前状态 共用) */
+
+
+/* Modal body: scrollable content area */
+
+
+/* HLCC v7.10: modal header layout fix (title + close button in same row) */
+
+
+/* 状态标签：今日护理标题右侧的圆角长条 */
+.hlcc-status-pill {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #4b5563;
+  background: rgba(249, 250, 251, 0.9);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .hlcc-titlebar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .hlcc-status-pill {
+    align-self: flex-start;
+  }
+}
+
+/* 顶部品牌：HANDLock X 放大，X 为蓝色 */
+.hlcc-brand-line1 {
+  display: flex;
+  align-items: baseline;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #111827;
+}
+
+.hlcc-brand-main {
+  margin-right: 6px;
+}
+
+.hlcc-brand-x {
+  color: #2563eb;
+}
+
+.hlcc-brand-line2 {
+  font-size: 12px;
+  color: #6b7280;
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+}
+
+
+.hlcc-titlebar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hlcc-title-main {
+  flex: 1 1 auto;
+}
+
+.hlcc-title-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.hlcc-day {
+  font-size: 14px;
+  color: #666666;
+  white-space: nowrap;
+}
+
+.hlcc-status-pill {
+  align-self: flex-end;
+}
+
+.hlcc-phase-tag {
+  font-size: 13px;
+  color: #64748b;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.hlcc-progress-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.hlcc-progress-pct {
+  font-weight: 600;
+  font-size: 13px;
+  color: #111827;
+}
+
+
+.hlcc-day-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #444;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+
+.hlcc-card.hlcc-today
+}
+
+
+.hlcc-title-main-inline .hlcc-day-pill {
+  white-space: nowrap;
+}
+
+
+/* Soften background frame for account "我的疗程" list */
+.hlcc-account .hlcc-course-item {
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+
+/* Simplify course list item appearance (remove white card frame) */
+
+
+.hlcc-title-with-pill {
+  display: flex;
+  align-items: center;
+  /* 垂直居中标题 + 恢复日胶囊 */
+  gap: 8px;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.hlcc-title-with-pill .hlcc-day-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #444;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+
+/* Account tab main area: no card background */
+
+
+/* Account tab: flatten all sections (no card background / shadow / border radius) */
+
+
+/* Account settings: simple blocks, no card frame */
+.hlcc-account-block {
+  margin: 8px 0 12px 0;
+}
+
+
+/* Small-screen overall scale: slightly smaller base font + title */
+@media (max-width: 380px) {
+  .hlcc-wrap {
+    font-size: 15px;
+  }
+
+  .hlcc-big-text {
+    font-size: 16px;
+  }
+}
+
+
+/* Today care title + day-pill centered frame */
+.hlcc-today .hlcc-titlebar {
+  display: flex;
+  justify-content: center;
+}
+
+.hlcc-today .hlcc-title-with-pill {
+  background: #f5f5f4;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+
+/* Center-align Today care title + day-pill within a soft frame */
+.hlcc-today .hlcc-titlebar {
+  display: flex;
+  justify-content: center;
+}
+
+.hlcc-titlebar-todaycapsule {
+  margin: 10px auto 6px;
+  display: flex;
+  justify-content: center;
+}
+
+.hlcc-titlebar-todaycapsule .hlcc-title-with-pill {
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 4px 14px;
+  display: inline-flex;
+  align-items: center;
+  /* 垂直对齐文字 + pill */
+  gap: 10px;
+  margin: 0 auto;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  /* capsule 阴影 */
+}
+
+/* 今日护理 capsule 专用：减小标题字号 */
+.hlcc-titlebar-todaycapsule .hlcc-h2 {
+  font-size: 18px;
+}
+
+
+.hlcc-today .hlcc-title-with-pill {
+  background: #f5f5f4;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+
+/* Force capsule total centering */
+.hlcc-today .hlcc-title-with-pill {
+  display: inline-flex;
+  margin: 0 auto;
+}
+
+
+/* Floating tutorial FAB */
+.hlcc-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 10030;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  pointer-events: auto;
+}
+
+.hlcc-fab-label {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #444;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  white-space: nowrap;
+  /* v6.8.6 固定一行显示 */
+}
+
+.hlcc-fab-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2563eb, #60a5fa);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.40);
+}
+
+.hlcc-fab-btn:active {
+  transform: translateY(2px) scale(0.88);
+  /* v6.8.6 增强手机端按下效果 */
+}
+
+.hlcc-fab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: hlcc-pill-pulse 1.6s ease-in-out infinite;
+}
+
+.hlcc-fab-pill {
+  width: 26px;
+  height: 26px;
+}
+
+@keyframes hlcc-pill-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.15);
+    /* v6.8.6 增强手机端脉动效果 */
+  }
+}
+
+/* Floating tutorial panel */
+.hlcc-float-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  /* Dynamic Viewport Height for Mobile */
+  z-index: 99999;
+  /* Boost Z-Index */
+
+  /* Delicate Glass */
+  background: transparent !important;
+
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Default Hidden State */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* Prevent clicks when hidden */
+  /* Premium Ease-Out-Expo (Smooth & Stable) */
+  transition: opacity 0.4s cubic-bezier(0.19, 1, 0.22, 1), visibility 0.4s;
+}
+
+.hlcc-float-panel.is-open {
+  display: flex !important;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto !important;
+  /* Force Enable Click/Scroll */
+}
+
+/* Inner panel: Mini, Refined, Scrollable */
+.hlcc-float-panel .hlcc-panel-inner,
+.hlcc-float-panel .hlcc-float-panel-inner {
+  width: 290px;
+  /* Mini Fixed Width */
+  max-width: 85vw;
+  /* Mobile Safety */
+  height: auto;
+  max-height: 70vh;
+  /* Don't fill screen height */
+
+  background: #ffffff;
+  border-radius: 20px;
+  /* Tighter refined corners */
+  box-shadow: 0 40px 80px -12px rgba(0, 0, 0, 0.22), 0 16px 32px -8px rgba(0, 0, 0, 0.12);
+  /* Softer deep shadow */
+
+  /* Initial State: Scale down + slight Y shift (pop effect) */
+  transform: scale(0.94) translateY(12px);
+  opacity: 0;
+
+  /* Use Apple-style spring/damping curve */
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.35s cubic-bezier(0.19, 1, 0.22, 1);
+
+  /* Hardware acceleration hints */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+
+  /* Scroll Fixes */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Interior scroll only */
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
+}
+
+.hlcc-float-panel.is-open .hlcc-panel-inner,
+.hlcc-float-panel.is-open .hlcc-float-panel-inner {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+.hlcc-float-panel-inner {
+  pointer-events: auto;
+  width: min(420px, 78vw);
+  max-height: 78vh;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.60), 0 -10px 35px rgba(15, 23, 42, 0.25);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  pointer-events: auto;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  /* touch-action: pan-y;  <-- Removed to allow pinch-zoom */
+}
+
+.hlcc-float-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hlcc-float-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hlcc-float-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.hlcc-float-body {
+  margin-top: 4px;
+  max-height: 60vh;
+  padding-right: 4px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  text-align: center;
+}
+
+.hlcc-tutorial-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hlcc-tutorial-step {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.hlcc-tutorial-step:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.hlcc-tutorial-step-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.hlcc-tutorial-step-text {
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* v6.8.6 换药教程图片圆角 */
+.hlcc-tutorial-step img,
+.hlcc-tutorial-step-text img {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.hlcc-tutorial-video {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Tutorial video: bilibili play overlay (so we can manage pause/mutex across videos) */
+.hlcc-bili-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.hlcc-bili-playbtn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .85);
+  background: rgba(0, 0, 0, .35);
+  color: #fff;
+  font-size: 20px;
+  line-height: 56px;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hlcc-bili-wrap.is-playing .hlcc-bili-playbtn {
+  display: none;
+}
+
+.hlcc-tutorial-video a {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #eef2ff;
+  font-size: 12px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.hlcc-tutorial-video a:hover {
+  background: #e0e7ff;
+  text-decoration: none;
+}
+
+.hlcc-tutorial-empty {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Lock body scroll when panel open */
+body.hlcc-lock {
+  overflow: hidden;
+}
+
+
+/* Stage switch FAB: slightly higher than tutorial FAB */
+.hlcc-fab-stage {
+  bottom: 40px;
+}
+
+
+/* Phase switch warning panel */
+.hlcc-phase-panel-inner {
+  max-width: 320px;
+  width: calc(100% - 40px);
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+}
+
+.hlcc-phase-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 9px;
+  background: rgba(249, 115, 22, 0.08);
+  color: #b45309;
+  margin-bottom: 8px;
+}
+
+.hlcc-phase-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.hlcc-phase-sub {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.hlcc-phase-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  /* Allow wrapping on small screens */
+}
+
+/* Specific refinement for phase switch buttons (make them compact) */
+.hlcc-phase-actions .hlcc-btn {
+  font-size: 13px !important;
+  padding: 6px 14px !important;
+  height: auto !important;
+  min-height: 32px !important;
+  border-radius: 10px !important;
+}
+
+/* "NO" button - Danger Red */
+.hlcc-phase-actions [data-hlcc-phase="no"] {
+  background: #ef4444 !important;
+  /* Red-500 */
+  color: #ffffff !important;
+  border: 1px solid #ef4444 !important;
+}
+
+/* FAB More Group Container */
+.hlcc-fab-more-group {
+  position: absolute;
+  bottom: 120px;
+  /* moved up from 70px to avoid overlap */
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+  /* Animation Init State - v6.8.6 增强手机端动效 */
+  opacity: 0;
+  transform: translateY(20px) scale(0.85);
+  visibility: hidden;
+  /* use visibility */
+  transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    visibility 0.35s;
+  pointer-events: none;
+}
+
+.hlcc-fab-more-group.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Tiny toast for progress guard hints */
+
+/* === Words to You (Guestbook) Visual Enhancement === */
+@keyframes hlccHeartbeat {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+  }
+
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 10px rgba(244, 63, 94, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+}
+
+#hlcc-words-trigger-btn {
+  background: #f43f5e !important;
+  /* Rose-500 */
+  border-color: #f43f5e !important;
+  color: white !important;
+  animation: hlccHeartbeat 2s infinite;
+}
+
+#hlcc-words-trigger-btn .hlcc-btn-icon-svg {
+  stroke: white !important;
+}
+
+.hlcc-toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.hlcc-toast {
+  max-width: 280px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.6);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: auto;
+}
+
+.hlcc-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hlcc-fab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+
+/* HLCC front: treatment photo compare gallery */
+.hlcc-compare-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hlcc-compare-main {
+  border-radius: 14px;
+  overflow: hidden;
+  background: transparent;
+  /* 去掉黑框背景 */
+  width: 100%;
+}
+
+.hlcc-compare-main-inner {
+  position: relative;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hlcc-compare-main-inner img {
+  position: static;
+  display: block;
+  width: 55vw;
+  /* 你要求的大图宽度 55% */
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  /* 保持比例完整显示，不裁切 */
+  border-radius: 14px;
+  /* v6.8.6 疗程照片对比大图圆角 */
+}
+
+.hlcc-compare-meta {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hlcc-compare-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+}
+
+.hlcc-compare-thumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  flex: 0 0 auto;
+  min-width: 86px;
+}
+
+.hlcc-compare-thumb-inner {
+  border-radius: 10px;
+  overflow: hidden;
+  background: #020617;
+}
+
+.hlcc-compare-thumb-inner img {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+}
+
+.hlcc-compare-thumb-meta {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.hlcc-compare-thumb-index {
+  font-weight: 600;
+}
+
+.hlcc-compare-thumb.is-active .hlcc-compare-thumb-inner {
+  outline: 2px solid #38bdf8;
+  outline-offset: 0;
+}
+
+.hlcc-compare-thumb.is-active .hlcc-compare-thumb-meta {
+  color: #0f172a;
+}
+
+
+/* HLCC front: compare gallery FAB floating panel (non-overlay) */
+.hlcc-compare-fab-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 104px;
+  bottom: calc(104px + env(safe-area-inset-bottom));
+  z-index: 55;
+  display: none;
+  pointer-events: none;
+}
+
+.hlcc-compare-fab-panel.is-open {
+  display: block;
+  pointer-events: auto;
+}
+
+.hlcc-compare-fab-panel .hlcc-float-panel-inner {
+  width: min(420px, 78vw);
+  max-height: 78vh;
+  margin: 0;
+}
+
+@media (max-width:480px) {
+  .hlcc-compare-fab-panel {
+    right: 12px;
+    left: 12px;
+    bottom: 96px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .hlcc-compare-fab-panel .hlcc-float-panel-inner {
+    width: 100%;
+  }
+}
+
+
+/* HLCC treatment photo compare · empty QR state */
+.hlcc-compare-empty {
+  padding: 12px 8px 16px;
+  text-align: center;
+}
+
+.hlcc-compare-qr {
+  margin: 10px auto 6px;
+}
+
+.hlcc-compare-qr img {
+  width: 200px;
+  max-width: 70vw;
+  height: auto;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 8px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+}
+
+.hlcc-compare-empty-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+
+/* Add button on compare thumbnails right side */
+.hlcc-compare-add-btn {
+  border: 0;
+  padding: 6px 10px;
+  margin-left: 4px;
+  background: #0f172a;
+  color: #e5e7eb;
+  border-radius: 999px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.hlcc-compare-add-btn:hover {
+  background: #020617;
+}
+
+.hlcc-compare-add-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.hlcc-compare-add-label {
+  line-height: 1.1;
+}
+
+/* Inline QR panel for adding photos when gallery already has images */
+.hlcc-compare-qr-inline {
+  margin-top: 10px;
+  text-align: center;
+  display: none;
+}
+
+.hlcc-compare-qr-inline.is-open {
+  display: block;
+}
+
+
+/* Override: make compare add button look like a thumb card */
+.hlcc-compare-add-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  flex: 0 0 auto;
+  min-width: 86px;
+  color: inherit;
+}
+
+.hlcc-compare-add-inner {
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.hlcc-compare-add-icon {
+  font-size: 22px;
+  line-height: 1;
+  color: #e5e7eb;
+}
+
+.hlcc-compare-add-text {
+  font-size: 10px;
+  line-height: 1.3;
+  display: block;
+  padding-top: 2px;
+}
+
+
+/* Compare: add button as same size thumb with plus icon only */
+.hlcc-compare-add-btn {
+  /* inherit base .hlcc-compare-thumb box */
+}
+
+.hlcc-compare-add-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  /* same as thumb image height */
+}
+
+.hlcc-compare-add-icon {
+  font-size: 30px;
+  line-height: 1;
+  color: #e5e7eb;
+}
+
+/* hide any extra text block if present */
+.hlcc-compare-add-text {
+  display: none;
+}
+
+
+/* FINAL: Compare add button styled as thumb-sized plus card */
+.hlcc-compare-add-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  flex: 0 0 auto;
+  min-width: 86px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hlcc-compare-add-inner {
+  border-radius: 10px;
+  overflow: hidden;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  /* same as compare thumb image height */
+}
+
+.hlcc-compare-add-icon {
+  font-size: 30px;
+  line-height: 1;
+  color: #e5e7eb;
+}
+
+
+/* v5.8.12: 我的疗程时间线（方案 C） */
+.hlcc-timeline-card {
+  margin: 14px 0;
+  padding: 10px 14px 12px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+}
+
+.hlcc-timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.hlcc-timeline-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hlcc-timeline-sub {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.hlcc-timeline-strip {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+/* Legacy inner removed to prevent layout shift */
+
+.hlcc-timeline-item {
+  scroll-snap-align: center;
+  text-align: center;
+  min-width: 88px;
+}
+
+.hlcc-timeline-dot-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.hlcc-timeline-dot-wrap {
+  position: relative;
+  padding-bottom: 2px;
+}
+
+.hlcc-timeline-line {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, #e5e7eb, #e5e7eb);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.hlcc-timeline-dot {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #9ca3af;
+  background: #f9fafb;
+  margin: 0 auto;
+}
+
+.hlcc-timeline-dot--active {
+  width: 18px;
+  height: 18px;
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.hlcc-timeline-label {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.25;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hlcc-timeline-date {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.hlcc-timeline-empty {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+
+/* v5.8.13: 调整时间线卡片为更纤薄样式 */
+.hlcc-timeline-card {
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.03);
+}
+
+.hlcc-timeline-head {
+  margin-bottom: 4px;
+}
+
+.hlcc-timeline-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hlcc-timeline-sub {
+  font-size: 10px;
+}
+
+.hlcc-timeline-strip {
+  padding: 4px 0 2px;
+  margin: 0;
+  gap: 12px;
+}
+
+.hlcc-timeline-strip-inner {
+  gap: 12px;
+}
+
+.hlcc-timeline-item {
+  min-width: 78px;
+}
+
+.hlcc-timeline-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.hlcc-timeline-dot--active {
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.hlcc-timeline-label {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.hlcc-timeline-date {
+  margin-top: 1px;
+  font-size: 9px;
+}
+
+
+/* v5.8.14: 疗程切换 ultra-thin 无阴影版 */
+.hlcc-timeline-card {
+  margin: 6px 0 4px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: none;
+}
+
+.hlcc-timeline-head {
+  margin-bottom: 2px;
+}
+
+.hlcc-timeline-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hlcc-timeline-sub {
+  display: none;
+}
+
+.hlcc-timeline-strip {
+  padding: 0;
+  margin: 0;
+  gap: 10px;
+}
+
+.hlcc-timeline-strip-inner {
+  gap: 10px;
+}
+
+.hlcc-timeline-item {
+  min-width: 64px;
+}
+
+.hlcc-timeline-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.hlcc-timeline-dot--active {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.hlcc-timeline-label {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.hlcc-timeline-date {
+  margin-top: 1px;
+  font-size: 9px;
+  color: #9ca3af;
+}
+
+
+/* v5.8.15: 疗程切换视觉精修 - 标题质感 + 居中 + 行距优化 */
+.hlcc-timeline-title {
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+
+.hlcc-timeline-strip {
+  justify-content: center;
+}
+
+.hlcc-timeline-strip-inner {
+  justify-content: center;
+}
+
+.hlcc-timeline-dot-wrap {
+  padding-bottom: 0;
+}
+
+.hlcc-timeline-label {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.2;
+  max-width: 96px;
+  color: #4b5563;
+}
+
+
+/* v5.8.17: 扩大疗程切换点击区域，点+文字整体可点 */
+.hlcc-timeline-dot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 32px;
+  padding: 4px 6px 3px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+}
+
+.hlcc-timeline-dot-btn:disabled {
+  opacity: 1;
+}
+
+.hlcc-timeline-dot-wrap {
+  margin-bottom: 1px;
+}
+
+
+/* v5.8.21: 疗程切换 pill 文案优化：项目名 + 日期同一行，备注第二行 */
+.hlcc-timeline-label-row {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.hlcc-timeline-label-main {
+  font-size: 10px;
+  color: #4b5563;
+}
+
+.hlcc-timeline-note {
+  margin-top: 1px;
+  font-size: 9px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+
+/* v5.8.23: 疗程切换动效优化 */
+.hlcc-timeline-card {
+  animation: hlccTimelineCardIn 0.35s ease-out 0.02s both;
+}
+
+@keyframes hlccTimelineCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hlcc-timeline-dot-btn {
+  transition: transform 0.16s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.hlcc-timeline-dot-btn:active {
+  transform: scale(0.94);
+}
+
+.hlcc-timeline-dot {
+  transition: width 0.2s ease-out, height 0.2s ease-out, border-color 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.25s ease-out;
+}
+
+.hlcc-timeline-dot--active {
+  animation: hlccTimelineDotPulse 1.6s ease-out infinite;
+}
+
+@keyframes hlccTimelineDotPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.28);
+  }
+
+  70% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+/* active 项目文案轻微高亮 */
+.hlcc-timeline-label-main,
+.hlcc-timeline-note {
+  transition: color 0.22s ease-out;
+}
+
+.hlcc-timeline-dot-btn[disabled] .hlcc-timeline-label-main,
+.hlcc-timeline-dot-btn[disabled] .hlcc-timeline-note {
+  color: #111827;
+}
+
+/* 横向滚动更顺滑 */
+.hlcc-timeline-strip {
+  scroll-behavior: smooth;
+}
+
+
+/* v5.8.24: B — 首页两张主卡片进场动效 */
+.hlcc-card.hlcc-card-outline {
+  animation: hlccMainCardIn 0.42s ease-out 0.04s both;
+}
+
+.hlcc-card.hlcc-today {
+  animation: hlccMainCardIn 0.42s ease-out 0.12s both;
+}
+
+@keyframes hlccMainCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Keyframes for New Animations */
+@keyframes hlcc-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes hlcc-slide-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =========================================
+   6.1. Responsive Adjustments
+   ========================================= */
+
+/* 1. Immersive Card & Header */
+.hlcc-card-immersive {
+  position: relative;
+  overflow: hidden;
+  padding: 0 !important;
+  /* Reset default padding */
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+}
+
+.hlcc-immersive-header {
+  padding: 24px 20px 12px;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+}
+
+.hlcc-immersive-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.hlcc-immersive-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.hlcc-immersive-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.hlcc-immersive-body {
+  padding: 0 20px 24px;
+}
+
+/* 2. Knowledge Capsule (Why Line) */
+.hlcc-info-capsule-wrapper {
+  margin-bottom: 20px;
+}
+
+.hlcc-info-capsule {
+  list-style: none;
+  /* Hide default details marker */
+}
+
+.hlcc-info-capsule::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-info-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #eff6ff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  user-select: none;
+}
+
+.hlcc-info-summary:active {
+  transform: scale(0.98);
+  background: #dbeafe;
+}
+
+.hlcc-info-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.hlcc-icon-svg {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.hlcc-info-icon-svg {
+  width: 18px;
+  height: 18px;
+  color: #fbbf24;
+  /* Amber-400 for lightbulb */
+}
+
+.hlcc-info-label {
+  font-size: 8px;
+  /* Balanced size */
+  font-weight: 700;
+  /* Bold */
+  color: var(--hlcc-text-muted);
+  letter-spacing: 0.01em;
+}
+
+.hlcc-info-arrow {
+  font-size: 16px;
+  color: #60a5fa;
+  transition: transform 0.3s ease;
+}
+
+.hlcc-info-capsule[open] .hlcc-info-arrow {
+  transform: rotate(90deg);
+}
+
+.hlcc-info-content {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  /* Reduced visual weight for secondary content */
+  font-size: 12px;
+  line-height: 1.7;
+  color: #64748b;
+  /* Slate-500 */
+  border: 1px solid #f1f5f9;
+  /* Lighter border */
+  animation: hlcc-fade-in 0.2s ease;
+}
+
+/* 3. Action Cards (Task List) */
+.hlcc-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Compact gap */
+  margin-bottom: 24px;
+}
+
+.hlcc-action-item {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px;
+  /* Compact padding */
+  box-shadow: 0 4px 20px rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  text-align: left;
+  /* Ensure text is left aligned */
+}
+
+
+.hlcc-action-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(148, 163, 184, 0.15);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.hlcc-action-icon-box {
+  width: 36px;
+  /* Compact size */
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+  font-size: 18px;
+  /* Compact icon */
+  margin-right: 12px;
+  /* Compact margin */
+  flex-shrink: 0;
+}
+
+.hlcc-action-text {
+  flex: 1;
+  font-size: 14px;
+  /* Compact font */
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.hlcc-action-check {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  margin-left: 12px;
+}
+
+/* Checkmark circle */
+.hlcc-check-circle {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+}
+
+/* 4. Glass Alert (Taboo) */
+.hlcc-glass-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: rgba(254, 226, 226, 0.5);
+  /* Red-100 with opacity */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(254, 202, 202, 0.6);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.hlcc-alert-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  background: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+}
+
+.hlcc-alert-content h4 {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #991b1b;
+  /* Red-800 */
+}
+
+.hlcc-alert-content p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7f1d1d;
+  opacity: 0.9;
+  text-align: left;
+  /* Ensure text is left aligned */
+}
+
+/* 5. Daily Quote */
+.hlcc-daily-quote {
+  text-align: center;
+  padding: 8px 32px;
+  font-family: "Georgia", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* 6. Footer Note */
+.hlcc-footer-note {
+  text-align: center;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 16px;
+}
+
+
+/* v5.8.28: treatment photo compare modal uses full-screen overlay like other system dialogs */
+.hlcc-compare-panel .hlcc-float-panel-inner {
+  max-height: 82vh;
+}
+
+
+/* v5.8.30: FAB 弹窗动效：缩放 + 渐显 */
+.hlcc-float-panel-inner {
+  transform-origin: 50% 60%;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.22s ease-out;
+}
+
+.hlcc-float-panel.is-open .hlcc-float-panel-inner {
+  opacity: 1;
+  transform: scale(1);
+}
+
+
+/* 自检提示块：共用 whyline 基础间距，但在视觉上稍作区分 */
+.hlcc-selfcheck-line .hlcc-selfcheck-details {
+  border-radius: 16px;
+  /* Card Layout & Shadow */
+  border: 1px solid #fecaca;
+  background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%);
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.08), 0 2px 4px rgba(220, 38, 38, 0.05);
+  /* Motion Entry */
+  animation: hlcc-slide-in-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  /* Clip behavior */
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+/* Hover state enhancement */
+.hlcc-selfcheck-line .hlcc-selfcheck-details:not([open]):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(220, 38, 38, 0.12), 0 4px 8px rgba(220, 38, 38, 0.06);
+}
+
+.hlcc-selfcheck-line .hlcc-why-summaryline {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  /* Remove default list styling in some browsers */
+  list-style: none;
+}
+
+.hlcc-selfcheck-line .hlcc-why-summaryline::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-why-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* New Pulse Badge */
+.hlcc-badge-pulse {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  padding: 2px 8px;
+  border-radius: 100px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+  animation: hlcc-pulse 2s infinite;
+}
+
+.hlcc-selfcheck-line .hlcc-why-title {
+  font-size: 14px;
+  /* Larger title */
+  font-weight: 700;
+  color: #991b1b;
+  letter-spacing: -0.02em;
+}
+
+.hlcc-selfcheck-line .hlcc-why-sub {
+  font-size: 11px;
+  color: #ef4444;
+  /* Use primary red for subtitle */
+  opacity: 0.8;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  /* Push text to right */
+  margin-right: 4px;
+}
+
+.hlcc-selfcheck-line .hlcc-why-chevron {
+  font-size: 18px;
+  color: #b91c1c;
+}
+
+/* 自检提示内容区 */
+.hlcc-selfcheck-body {
+  padding: 10px 12px 12px 12px;
+  background: linear-gradient(to bottom, #fff7f7, #ffffff);
+}
+
+.hlcc-selfcheck-item {
+  margin-bottom: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(248, 113, 113, .45);
+}
+
+.hlcc-selfcheck-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.hlcc-selfcheck-item-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7f1d1d;
+  display: flex;
+  align-items: flex-start;
+  /* Fix stretching: alignment top */
+  gap: 6px;
+  /* Increased gap */
+}
+
+.hlcc-selfcheck-item-title .hlcc-badge {
+  flex-shrink: 0;
+  /* Prevent badge from shrinking */
+  white-space: nowrap;
+  margin-top: 2px;
+  /* Visual alignment with text */
+}
+
+.hlcc-selfcheck-item-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #4b5563;
+  margin-top: 3px;
+}
+
+.hlcc-selfcheck-important {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+
+/* 自检提示：为不同类型的红色重点自动加 emoji 前缀 */
+.hlcc-selfcheck-important.hlcc-imp-water::before {
+  content: "💧 ";
+}
+
+.hlcc-selfcheck-important.hlcc-imp-hot::before {
+  content: "🔥 ";
+}
+
+.hlcc-selfcheck-important.hlcc-imp-friction::before {
+  content: "🙅‍♂️ ";
+}
+
+.hlcc-selfcheck-important.hlcc-imp-pain::before {
+  content: "😣 ";
+}
+
+.hlcc-selfcheck-important.hlcc-imp-photo::before {
+  content: "📸 ";
+}
+
+.hlcc-selfcheck-important.hlcc-imp-sun::before {
+  content: "☀️ ";
+}
+
+
+/* v6.1.58: 移动端疗程时间线保持单行横向滚动，但放宽 scroll 限制，确保可以完全滚到最后一个疗程 */
+@media (max-width: 520px) {
+  .hlcc-timeline-strip {
+    overflow-x: auto;
+    margin: 0 -4px;
+    padding: 6px 4px 4px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: none;
+  }
+
+  .hlcc-timeline-strip-inner {
+    min-width: max-content;
+    padding: 0 8px 0 4px;
+  }
+
+  .hlcc-timeline-item {
+    scroll-snap-align: none;
+    min-width: 80px;
+  }
+}
+
+
+/* v6.1.64 QR code center fix for photo compare empty state */
+.hlcc-compare-empty,
+.hlcc-compare-empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hlcc-compare-empty img,
+.hlcc-compare-empty .hlcc-qr,
+.hlcc-compare-empty canvas {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
+/* v6.1.65 QR code center fix (both empty state and inline state) */
+.hlcc-compare-qr-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.hlcc-compare-qr-inline .hlcc-compare-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.hlcc-compare-qr-inline .hlcc-compare-qr img,
+.hlcc-compare-empty .hlcc-compare-qr img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
+/* v6.1.66 QR inline should be hidden until user taps the + button */
+.hlcc-compare-qr-inline {
+  display: none;
+}
+
+.hlcc-compare-qr-inline.is-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.hlcc-compare-qr-inline.is-open .hlcc-compare-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+
+.hlcc-phase-emoji,
+.hlcc-phase-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  line-height: 1;
+}
+
+.hlcc-phase-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5px;
+}
+
+.hlcc-status-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  position: relative;
+  top: -1px;
+  /* Optical alignment */
+}
+
+.hlcc-animate-pulse {
+  animation: hlccPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes hlccPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Colors */
+.hlcc-text-rose {
+  color: #f43f5e;
+}
+
+.hlcc-text-amber {
+  color: #f59e0b;
+}
+
+.hlcc-text-emerald {
+  color: #10b981;
+}
+
+.hlcc-text-blue {
+  color: #3b82f6;
+}
+
+.hlcc-text-muted-light {
+  color: #cbd5e1;
+}
+
+display: block;
+}
+
+.hlcc-fab-emoji {
+  font-size: 18px;
+  line-height: 1;
+  display: block;
+}
+
+/* Fix overflow in '已进行' card */
+.hlcc-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.hlcc-big-text,
+.hlcc-meta,
+.hlcc-strong {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+
+/* Global invisible capture layer for modal click-outside close (no dimming) */
+#hlcc-modal-capture.hlcc-modal-capture {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0) !important;
+}
+
+/* v6.4.15 fix: keep capture below panels, allow panel interactions */
+
+/* v6.4.20 fix: stage switch left item clipping */
+.hlcc-phase-switch-card,
+.hlcc-phase-card,
+.hlcc-stage-card {
+  overflow-y: visible;
+  overflow-x: visible;
+}
+
+.hlcc-phase-switch-card .hlcc-phase-list,
+.hlcc-phase-card .hlcc-phase-list,
+.hlcc-stage-card .hlcc-phase-list,
+.hlcc-phase-switch-card .hlcc-stage-list,
+.hlcc-phase-card .hlcc-stage-list,
+.hlcc-stage-card .hlcc-stage-list {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-left: 10px;
+  scroll-padding-left: 10px;
+}
+
+.hlcc-phase-switch-card .hlcc-phase-item,
+.hlcc-phase-card .hlcc-phase-item,
+.hlcc-stage-card .hlcc-phase-item,
+.hlcc-phase-switch-card .hlcc-stage-item,
+.hlcc-phase-card .hlcc-stage-item,
+.hlcc-stage-card .hlcc-stage-item {
+  min-width: max-content;
+}
+
+/* HLCC Frontend v8.3.54 - More FAB toggle (no animation) */
+.hlcc-fab-btn-more {
+  background: #3b82f6 !important;
+  color: #fff !important;
+}
+
+.hlcc-fab-btn-more .hlcc-fab-icon {
+  color: #fff !important;
+  stroke: #fff !important;
+  /* SVG stroke */
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  display: flex;
+  /* Ensure centering */
+  align-items: center;
+  justify-content: center;
+}
+
+
+.hlcc-fab-clicklayer {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 99990;
+}
+
+.hlcc-fab {
+  z-index: 99999;
+}
+
+/* =========================================
+   Front-End Redesign: Phase 1 (Foundation)
+   ========================================= */
+
+:root {
+  /* --- 1. Color System (Vibrant & Gradient) --- */
+  --hlcc-primary: #2563eb;
+  /* Fallback */
+  --hlcc-primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --hlcc-primary-hover: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  --hlcc-primary-glow: 0 4px 14px 0 rgba(37, 99, 235, 0.3);
+
+  /* --- 2. Surface & Backgrounds (Depth) --- */
+  --hlcc-bg-page: #F8FAFC;
+  /* Slate-50: Cool, clean, modern */
+  --hlcc-bg-card: #FFFFFF;
+  --hlcc-bg-glass: rgba(255, 255, 255, 0.85);
+}
+
+/* =========================================
+   Details 展开/收起动画 (为什么这样护理 + 今日自检)
+   ========================================= */
+
+/* 1. 完全关闭状态 - 不占位 */
+.hlcc-why-details:not([open]) .hlcc-why-body,
+.hlcc-why-details:not([open]) .hlcc-selfcheck-body,
+.hlcc-course-more:not([open]) .hlcc-more-panel {
+  display: none;
+}
+
+/* 2. 准备展开状态 - 已渲染但不可见 (JS 添加 open 但未加 is-open) */
+.hlcc-why-details[open]:not(.is-open):not(.is-closing) .hlcc-why-body,
+.hlcc-why-details[open]:not(.is-open):not(.is-closing) .hlcc-selfcheck-body,
+.hlcc-course-more[open]:not(.is-open):not(.is-closing) .hlcc-more-panel {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  transform: translateY(-8px);
+}
+
+/* 3. 正在展开/已展开状态 */
+.hlcc-why-details.is-open .hlcc-why-body,
+.hlcc-why-details.is-open .hlcc-selfcheck-body,
+.hlcc-course-more.is-open .hlcc-more-panel {
+  animation: hlccDetailSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 4. 正在关闭状态 */
+.hlcc-why-details.is-closing .hlcc-why-body,
+.hlcc-why-details.is-closing .hlcc-selfcheck-body,
+.hlcc-course-more.is-closing .hlcc-more-panel {
+  animation: hlccDetailSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 关闭动画 Keyframes */
+@keyframes hlccDetailSlideUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* 展开动画 Keyframes */
+@keyframes hlccDetailSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+}
+
+/* 展开图标旋转动画 */
+.hlcc-why-chevron {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hlcc-why-details.is-open .hlcc-why-chevron {
+  transform: rotate(180deg);
+}
+
+
+:root {
+  /* --- 3. Border & Shadows (Soft) --- */
+  --hlcc-border-subtle: rgba(148, 163, 184, 0.15);
+  /* Slate-400 at 15% */
+  --hlcc-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --hlcc-shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.05),
+    0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  --hlcc-shadow-float: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 10px 15px -3px rgba(0, 0, 0, 0.3);
+
+  /* --- 4. Typography (Readability) --- */
+  --hlcc-font-sans: "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --hlcc-text-main: #0F172A;
+  /* Slate-900 */
+  --hlcc-text-muted: #64748B;
+  /* Slate-500 */
+  --hlcc-leading-relaxed: 1.6;
+}
+
+/* Apply Foundation */
+body {
+  background-color: var(--hlcc-bg-page) !important;
+  color: var(--hlcc-text-main) !important;
+  font-family: var(--hlcc-font-sans) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings Refinement */
+.hlcc-h1,
+.hlcc-h2,
+.hlcc-h3,
+.hlcc-title {
+  color: var(--hlcc-text-main) !important;
+  letter-spacing: -0.025em !important;
+  /* Tight tracking for modern feel */
+}
+
+/* Muted Text Refinement */
+.hlcc-muted,
+.hlcc-meta,
+.hlcc-sub {
+  color: var(--hlcc-text-muted) !important;
+}
+
+/* Card Modernization (Base Override) */
+.hlcc-card,
+.hlcc-panel {
+  background: var(--hlcc-bg-card) !important;
+  border: 1px solid var(--hlcc-border-subtle) !important;
+  box-shadow: var(--hlcc-shadow-card) !important;
+}
+
+/* --- Typography Refinements --- */
+
+/* Big Stat Numbers */
+.hlcc-big,
+.hlcc-big-text {
+  font-family: var(--hlcc-font-sans) !important;
+  color: var(--hlcc-primary) !important;
+  background: var(--hlcc-primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800 !important;
+  letter-spacing: -1px !important;
+}
+
+/* Unit Text next to big numbers */
+.hlcc-big-unit {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--hlcc-text-muted) !important;
+  -webkit-text-fill-color: var(--hlcc-text-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Strong / Emphasized Text */
+.hlcc-strong {
+  color: var(--hlcc-text-main) !important;
+  font-weight: 700 !important;
+}
+
+/* Body Text & Paragraphs */
+.hlcc-body p,
+.hlcc-p {
+  line-height: var(--hlcc-leading-relaxed) !important;
+  color: #334155 !important;
+  /* Slate-700 */
+}
+
+/* =========================================
+   Front-End Redesign: Phase 2 (Components)
+   ========================================= */
+
+/* --- 1. Modern Cards --- */
+.hlcc-card {
+  border-radius: 20px !important;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease !important;
+  background: var(--hlcc-bg-card) !important;
+  border: 1px solid var(--hlcc-border-subtle) !important;
+}
+
+@media (min-width: 768px) {
+  .hlcc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.08), 0 10px 15px -5px rgba(0, 0, 0, 0.04) !important;
+  }
+}
+
+/* --- 2. Buttons & Actions --- */
+/* Primary Button (Gradient) */
+.hlcc-btn,
+button.hlcc-btn-primary,
+a.hlcc-btn-primary {
+  background: var(--hlcc-primary-gradient) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1) !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.hlcc-btn:active,
+button.hlcc-btn-primary:active {
+  transform: scale(0.97) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Secondary Button (Soft) */
+.hlcc-btn-secondary {
+  background: #EFF6FF !important;
+  /* Blue-50 */
+  color: var(--hlcc-primary) !important;
+  border: 1px solid #DBEAFE !important;
+  /* Blue-100 */
+  box-shadow: none !important;
+}
+
+/* Ghost Button */
+.hlcc-btn.ghost,
+.hlcc-btn-ghost {
+  background: transparent !important;
+  color: var(--hlcc-text-muted) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.hlcc-btn.ghost:hover {
+  background: rgba(241, 245, 249, 0.8) !important;
+  /* Slate-100 */
+  color: var(--hlcc-text-main) !important;
+}
+
+/* --- 3. Form Inputs --- */
+.hlcc-wrap input[type="text"],
+.hlcc-wrap input[type="password"],
+.hlcc-wrap input[type="date"],
+.hlcc-wrap select,
+.hlcc-wrap textarea {
+  border: 1px solid #CBD5E1 !important;
+  /* Slate-300 */
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  font-size: 15px !important;
+  transition: opacity 0.2s ease, visibility 0.2s ease !important;
+  background: #ffffff !important;
+  color: var(--hlcc-text-main) !important;
+}
+
+.hlcc-wrap input:focus,
+.hlcc-wrap select:focus {
+  outline: none !important;
+  border-color: var(--hlcc-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+/* --- 4. Floating Panels (Glassmorphism) --- */
+.hlcc-float-panel-inner,
+.hlcc-mini-video {
+  background: #ffffff !important;
+  /* Removed backdrop-filter for stability */
+  border: none !important;
+  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.7) !important;
+  border-radius: 24px !important;
+}
+
+/* === v6.8.5 Animation Fixes for FAB Panels === */
+/* Ensure the container (backdrop) fades */
+.hlcc-float-panel {
+  display: flex !important;
+  /* Force flex so it's not display:none unless explicit inline style override */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.35s;
+  pointer-events: none;
+  background: transparent !important;
+  /* Removed backdrop-filter to prevent white bar glitch on iOS */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  position: fixed;
+  inset: 0;
+  /* Use inset:0 for robust full-viewport coverage including Safe Area */
+  width: auto;
+  height: auto;
+  z-index: 99999;
+  justify-content: center;
+  align-items: center;
+  /* Center the inner card */
+}
+
+/* Open state for container */
+.hlcc-float-panel.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Inner Card Animation (Scale + Fade) */
+.hlcc-float-panel-inner {
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: transform, opacity;
+}
+
+/* Open state for inner card */
+.hlcc-float-panel.is-open .hlcc-float-panel-inner {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ========================================
+   Three-Phase Progress Bars (v6.10.2 - Compact)
+   ======================================== */
+
+.hlcc-phase-progress-card {
+  padding: 14px 16px;
+}
+
+.hlcc-phase-progress-card .hlcc-progress-head {
+  font-size: 14px;
+  color: var(--hlcc-text-muted);
+  margin-bottom: 6px;
+}
+
+/* Phase Item Container - Compact */
+.hlcc-phase-item {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hlcc-border);
+}
+
+.hlcc-phase-item:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Phase Header - Compact */
+.hlcc-phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+.hlcc-phase-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hlcc-text);
+}
+
+.hlcc-phase-emoji,
+.hlcc-phase-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  line-height: 1;
+}
+
+.hlcc-phase-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5px;
+}
+
+.hlcc-status-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  position: relative;
+  top: -1px;
+  /* Optical alignment */
+}
+
+.hlcc-animate-pulse {
+  animation: hlccPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes hlccPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Colors */
+.hlcc-text-rose {
+  color: #f43f5e;
+}
+
+.hlcc-text-amber {
+  color: #f59e0b;
+}
+
+.hlcc-text-emerald {
+  color: #10b981;
+}
+
+.hlcc-text-blue {
+  color: #3b82f6;
+}
+
+.hlcc-text-muted-light {
+  color: #cbd5e1;
+}
+
+.hlcc-phase-range {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--hlcc-text-muted);
+  margin-left: 2px;
+}
+
+.hlcc-phase-override-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #F59E0B;
+  /* Amber */
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.hlcc-phase-status {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Collapsible Phase Functionality */
+.hlcc-phase-header-clickable {
+  cursor: pointer;
+  user-select: none;
+  justify-content: space-between;
+  /* Revert to space-between for right alignment */
+  padding: 4px;
+  margin: -4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.hlcc-phase-header-clickable:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.hlcc-phase-header-clickable:active {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Collapsible Content */
+.hlcc-phase-collapsible-content {
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed State */
+.hlcc-phase-item[data-collapsible="true"]:not(.hlcc-phase-expanded) .hlcc-phase-collapsible-content {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+/* Expanded State */
+.hlcc-phase-item[data-collapsible="true"].hlcc-phase-expanded .hlcc-phase-collapsible-content {
+  max-height: 500px;
+  opacity: 1;
+  margin-top: 6px;
+}
+
+/* Visual Dimming for Pending Phases */
+.hlcc-phase-item[data-status="pending"]:not(.hlcc-phase-expanded) {
+  opacity: 0.65;
+}
+
+.hlcc-phase-item[data-status="pending"]:not(.hlcc-phase-expanded):hover {
+  opacity: 0.8;
+}
+
+
+/* Status Colors */
+.hlcc-phase-item[data-status="completed"] .hlcc-phase-status {
+  color: #10B981;
+  /* Green */
+}
+
+.hlcc-phase-item[data-status="active"] .hlcc-phase-status {
+  color: #3B82F6;
+  /* Blue */
+}
+
+.hlcc-phase-item[data-status="pending"] .hlcc-phase-status {
+  color: var(--hlcc-text-muted);
+}
+
+/* Progress Bar Container - Full Width Background */
+.hlcc-phase-progress {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  background: var(--hlcc-bg-secondary);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.hlcc-phase-progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Completed state gradient */
+.hlcc-phase-item[data-status="completed"] .hlcc-phase-progress-bar {
+  background: linear-gradient(90deg, #10B981 0%, #34D399 100%);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+/* Pending state */
+.hlcc-phase-item[data-status="pending"] .hlcc-phase-progress-bar {
+  background: var(--hlcc-border);
+  box-shadow: none;
+}
+
+/* Progress Text - Compact */
+.hlcc-phase-progress-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--hlcc-text-muted);
+  margin-bottom: 4px;
+}
+
+.hlcc-phase-progress-pct {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--hlcc-primary);
+  letter-spacing: -0.5px;
+  font-size: 12px;
+  /* Retained original font-size */
+}
+
+.hlcc-phase-progress-pct small {
+  font-size: 0.75em;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.hlcc-day-progress-detail {
+  font-size: 11px;
+  color: var(--hlcc-text-muted);
+}
+
+/* Phase Tip - Compact */
+.hlcc-phase-tip {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--hlcc-text);
+  padding: 8px 10px;
+  background: var(--hlcc-bg-secondary);
+  border-radius: 6px;
+  border-left: 2px solid #3B82F6;
+}
+
+.hlcc-phase-item[data-status="completed"] .hlcc-phase-tip {
+  border-left-color: #10B981;
+  background: #F0FDF4;
+}
+
+.hlcc-phase-item[data-status="pending"] .hlcc-phase-tip {
+  border-left-color: var(--hlcc-border);
+  opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .hlcc-phase-label {
+    font-size: 12px;
+  }
+
+  .hlcc-phase-emoji {
+    font-size: 14px;
+  }
+
+  .hlcc-phase-status {
+    font-size: 10px;
+  }
+}
+
+/* ------------------------------------------------------------
+ * Daily Quote (Encouragement) - Sans-serif Enforcement
+ * ---------------------------------------------------------- */
+.hlcc-daily-quote {
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 16px;
+  margin-bottom: 20px;
+  padding: 0 10px;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+
+/* ------------------------------------------------------------
+ * Action Cards (Today's Care) - Ultra Compact Mode
+ * ---------------------------------------------------------- */
+.hlcc-immersive-title-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  /* CRITICAL: Force single line */
+  width: 100%;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+.hlcc-immersive-title {
+  font-size: 18px;
+  /* Default */
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  white-space: nowrap;
+  margin-right: 4px;
+  /* Tiny gap */
+}
+
+/* Responsive adjustments for very small screens */
+@media (max-width: 375px) {
+  .hlcc-immersive-title {
+    font-size: 16px;
+    /* Shrink title on small screens */
+  }
+}
+
+.hlcc-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  flex-wrap: nowrap;
+  /* CRITICAL: Force single line */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.hlcc-immersive-pill {
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.hlcc-action-pill {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
+  font-size: 11px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+
+.hlcc-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Restored gap for card separation */
+  margin-top: 10px;
+}
+
+.hlcc-action-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* CRITICAL: Center emoji and text */
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.08);
+  min-height: auto;
+  cursor: default;
+  animation: hlcc-green-pulse 3s infinite ease-in-out;
+}
+
+.hlcc-action-item:active {
+  transform: none !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01) !important;
+}
+
+.hlcc-action-icon-box {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  margin-right: 8px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.hlcc-action-text {
+  flex: 1;
+  font-family: var(--hlcc-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #475569;
+  font-weight: 600;
+  /* Bold for emphasis */
+  padding-right: 2px;
+  letter-spacing: 0.02em;
+}
+
+.hlcc-action-check {
+  display: none;
+}
+
+
+/* ------------------------------------------------------------
+ * Taboo Cards (Things to Avoid) - Flashing Red
+ * ---------------------------------------------------------- */
+.hlcc-taboo-container {
+  margin-top: 20px;
+}
+
+.hlcc-taboo-title-group {
+  margin-bottom: 8px;
+  padding-left: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.hlcc-taboo-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.hlcc-taboo-sub {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.hlcc-taboo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes hlcc-red-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    border-color: #fecaca;
+  }
+
+  50% {
+    box-shadow: 0 0 4px 1px rgba(239, 68, 68, 0.15);
+    border-color: #fca5a5;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    border-color: #fecaca;
+  }
+}
+
+@keyframes hlcc-green-pulse {
+  0% {
+    box-shadow: 0 1px 3px rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.15);
+  }
+
+  50% {
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 1px 3px rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.15);
+  }
+}
+
+.hlcc-taboo-item {
+  display: flex;
+  align-items: center;
+  /* CRITICAL: Center emoji and text */
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-height: auto;
+  animation: hlcc-red-pulse 3s infinite ease-in-out;
+}
+
+.hlcc-taboo-icon-box {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  margin-right: 8px;
+  color: #ef4444;
+}
+
+.hlcc-taboo-text {
+  flex: 1;
+  font-family: var(--hlcc-font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #991b1b;
+  font-weight: 600;
+  /* Bold for emphasis */
+  letter-spacing: 0.02em;
+}
+
+
+/* ------------------------------------------------------------
+ * Why So Care - Refined
+ * ---------------------------------------------------------- */
+.hlcc-info-capsule-wrapper {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.hlcc-info-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  /* Tighter padding */
+  cursor: pointer;
+  list-style: none;
+}
+
+.hlcc-info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hlcc-info-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  /* Tighter spacing */
+}
+
+.hlcc-info-icon {
+  font-size: 10px;
+  /* Smaller emoji */
+  line-height: 1;
+}
+
+.hlcc-info-label {
+  font-size: 8px;
+  /* Balanced size */
+  font-weight: 700;
+  /* Bold */
+  color: var(--hlcc-text-muted);
+  letter-spacing: 0.01em;
+}
+
+.hlcc-info-arrow {
+  font-size: 12px;
+  color: var(--hlcc-text-muted);
+  transition: transform 0.2s;
+  opacity: 0.7;
+}
+
+details[open] .hlcc-info-arrow {
+  transform: rotate(90deg);
+}
+
+.hlcc-info-content {
+  margin-top: 6px;
+  padding: 8px 12px;
+  /* Better padding for content */
+  background: rgba(248, 250, 252, 0.5);
+  /* Very subtle bg */
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  /* Improved leading */
+  color: #475569;
+  /* Slightly darker than muted */
+}
+
+/* Team Message & Guestbook (v7.6.0) */
+.hlcc-footer-actions {
+  text-align: center;
+  margin-top: 32px;
+  margin-bottom: 24px;
+}
+
+.hlcc-team-message-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 8px 20px;
+  border-radius: 99px;
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hlcc-team-message-btn:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.1);
+}
+
+
+/**
+ * v7.9.0: 系统留言编辑样式
+ */
+
+/* 系统留言容器 */
+.hlcc-system-message {
+  position: relative;
+}
+
+/* 编辑按钮 */
+.hlcc-edit-system-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  z-index: 10;
+}
+
+.hlcc-system-message:hover .hlcc-edit-system-btn {
+  opacity: 1;
+}
+
+.hlcc-edit-system-btn:hover {
+  background: #fff;
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.hlcc-edit-system-btn .dashicons {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+/* 系统留言内容 */
+.hlcc-system-content {
+  padding-right: 40px;
+  /* 为编辑按钮留出空间 */
+}
+
+/* 编辑模态框 */
+.hlcc-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 99999;
+}
+
+.hlcc-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.hlcc-modal-content {
+  position: relative;
+  max-width: 600px;
+  margin: 50px auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  z-index: 100000;
+}
+
+.hlcc-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+}
+
+.hlcc-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.hlcc-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.hlcc-modal-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.hlcc-modal-body {
+  padding: 24px;
+}
+
+.hlcc-modal-body textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 200px;
+}
+
+.hlcc-modal-body textarea:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.hlcc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+}
+
+.hlcc-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  border: none;
+}
+
+.hlcc-btn-secondary {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.hlcc-btn-secondary:hover {
+  background: #e5e5e5;
+}
+
+.hlcc-btn-primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+}
+
+.hlcc-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.hlcc-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* v7.9.0 Fix: Edit Button Style */
+.hlcc-edit-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s ease;
+  padding: 0;
+  margin-left: 8px;
+}
+
+.hlcc-edit-btn:hover {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+  transform: scale(1.1);
+}
+
+.hlcc-edit-btn .dashicons {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* v8.0.0 System Message Redesign */
+.hlcc-system-message {
+  background: linear-gradient(to bottom, #fdf4ff, #fff);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.05);
+}
+
+.hlcc-system-message:hover {
+  border-color: rgba(147, 51, 234, 0.4);
+  box-shadow: 0 6px 16px rgba(147, 51, 234, 0.08);
+}
+
+.system-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f3e8ff;
+  color: #9333ea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-right: 12px;
+  border: 1px solid rgba(147, 51, 234, 0.2);
+}
+
+.hlcc-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #9333ea;
+  color: #fff;
+  border-radius: 50%;
+  margin-left: 6px;
+  font-size: 10px;
+  vertical-align: middle;
+}
+
+.hlcc-verified-badge .dashicons {
+  font-size: 10px;
+  width: 10px;
+  height: 10px;
+  line-height: normal;
+}
+
+/* v8.0.0 UI Simplification & Z-Index Fix */
+
+/* 1. Simplify Guestbook Item Cards (Remove borders, just border-bottom) */
+.hlcc-gm-item {
+  color: #333;
+  margin-bottom: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.hlcc-gm-item:last-child {
+  border-bottom: none;
+}
+
+/* 2. System Message Card (Keep distinct but simplified) */
+.hlcc-system-message {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #fdf4ff, #fff);
+  border: 1px solid rgba(147, 51, 234, 0.15);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.03);
+}
+
+/* 3. Fix Edit Modal Z-Index (Must be higher than Team Msg Modal) */
+#hlcc-system-edit-modal {
+  z-index: 2147483647 !important;
+  /* Max value to ensure top */
+}
+
+/* Ensure backdrop is also high */
+#hlcc-system-edit-modal .hlcc-modal-backdrop {
+  z-index: 2147483646;
+}
+
+/* v8.0.4 UI Simplification: Remove nested card look */
+.hlcc-system-message {
+  border: none !important;
+  box-shadow: none !important;
+  background: #fdf4ff !important;
+  /* Keep light purple bg for distinction */
+  border-radius: 8px !important;
+  margin-bottom: 12px !important;
+  padding: 12px 0 !important;
+  /* Reduce padding side to align with text */
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+/* Ensure simplifcation on container */
+/* Unified White Style for Guestbook Items (v8.1.3) */
+.hlcc-gm-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  padding: 16px 0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  /* Very subtle separator */
+  background: transparent !important;
+  /* Blend with unified white container */
+  border-radius: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.hlcc-gm-item:last-child {
+  border-bottom: none !important;
+}
+
+.hlcc-gm-header {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.hlcc-gm-user-info {
+  display: flex;
+  align-items: baseline;
+  /* Align text baselines */
+  gap: 8px;
+  width: 100%;
+}
+
+.hlcc-gm-author {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.hlcc-gm-time {
+  font-size: 11px;
+  color: #999;
+}
+
+/* Ensure system messages still look distinct but clean */
+.hlcc-system-message {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+  padding: 12px 16px !important;
+  /* Restore some horizontal padding for bg */
+  background: #faf5ff !important;
+  /* Very light purple */
+  border-radius: 8px !important;
+  border-left: 3px solid #d8b4fe !important;
+  /* Purple accent on left */
+}
+
+/* Adjust system header to use flex for icon */
+.hlcc-system-message .hlcc-gm-user-info {
+  align-items: center;
+}
+
+/* Hide system avatar strictly if we want pure text, but user said 'remove customer avatar'. 
+   Code still renders system avatar, so we keep it aligned. */
+.system-avatar {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 14px !important;
+  margin-right: 8px !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* v8.0.6 UI Refinement */
+
+/* 1. Remove outer card border/shadow as requested */
+.hlcc-team-msg-inner {
+  box-shadow: none !important;
+  border: none !important;
+  /* If background makes it look like a card, keep it for legibility or ask? 
+     User said 'card border', so shadow/border removal is key. 
+     We keep background for text contrast. */
+}
+
+/* Team Message Modal (v8.3.0) */
+.hlcc-modal-overlay-v3 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+
+  backdrop-filter: blur(4px);
+  z-index: 100000;
+  display: flex;
+  /* Flex is set inline by JS, ensuring centered content */
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: hlccFadeIn 0.3s forwards;
+  padding: 20px;
+}
+
+.hlcc-modal-box-v3 {
+
+  background: #ffffff;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 20px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  transform: translateY(20px);
+  animation: hlccSlideUp 0.3s forwards;
+}
+
+.hlcc-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 5px;
+  border-radius: 50%;
+  transition: transform 0.2s, opacity 0.2s;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hlcc-modal-close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.hlcc-tm-header {
+  padding: 24px 24px 16px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.hlcc-tm-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+}
+
+.hlcc-tm-scroll-content {
+  padding: 24px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hlcc-tm-hero {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.hlcc-tm-hero p {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.hlcc-tm-support {
+  margin-bottom: 24px;
+  text-align: center;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.hlcc-tm-support p {
+  /*
+ * Version: 8.7.8
+ * Updated: 2026-02-06
+ * Description: Core styles for HandLock Care Center.
+ */
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hlcc-tm-section {
+  margin-bottom: 20px;
+}
+
+.hlcc-tm-section h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hlcc-tm-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hlcc-tm-list li {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 6px;
+  line-height: 1.5;
+  padding-left: 10px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.hlcc-tm-tips-card {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.hlcc-tm-tip-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hlcc-tm-tip-text {
+  font-size: 13px;
+  color: #0369a1;
+  line-height: 1.5;
+}
+
+@keyframes hlccFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hlccSlideUp {
+  from {
+    transform: translateY(20px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   UI PRO MAX: UNIFIED ICON & TIMELINE CARDS
+   ============================================================ */
+
+/* Unified Icon Base */
+.hlcc-icon-svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.hlcc-icon-sm {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+.hlcc-btn-icon-svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  vertical-align: -3px;
+}
+
+.hlcc-fab-icon-svg {
+  width: 18px;
+  /* Reduced from 22px */
+  height: 18px;
+  color: #fff !important;
+  fill: none !important;
+  /* Force no fill to avoid white blocks */
+}
+
+/* Modern Course Timeline Cards - Compact Mode */
+.hlcc-timeline-strip {
+  position: relative;
+  /* No masking as requested */
+}
+
+.hlcc-timeline-scroller {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 4px 8px;
+  /* Compressed padding */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hlcc-timeline-scroller::-webkit-scrollbar {
+  display: none;
+  /* Hide scrollbar for Chrome/Safari */
+}
+
+.hlcc-timeline-card-item {
+  flex: 0 0 60px;
+  /* Ultra narrow without icons */
+  /* Extremely narrow as requested */
+  perspective: 1000px;
+  /* Ensure children can fill height */
+  display: flex;
+  flex-direction: column;
+}
+
+.hlcc-timeline-card-item form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.hlcc-course-card-btn {
+  width: 100%;
+  flex: 1;
+  /* Fill available height */
+  text-align: left;
+  padding: 10px 12px;
+  /* Thinner padding */
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  /* Smaller radius for compact look */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Ultra tight gap */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+.hlcc-timeline-card-item.is-active .hlcc-course-card-btn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35) 0%, rgba(37, 99, 235, 0.3) 100%);
+  border-color: rgba(59, 130, 246, 0.9);
+  color: #fff !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 8px rgba(255, 255, 255, 0.1);
+  /* No scale, uniform size */
+  z-index: 5;
+}
+
+.hlcc-course-card-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.hlcc-card-icon-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hlcc-card-icon-svg {
+  width: 16px;
+  /* Reduced from 18px */
+  height: 16px;
+  color: inherit;
+  opacity: 0.6;
+}
+
+.hlcc-timeline-card-item.is-active .hlcc-card-icon-svg {
+  color: #60a5fa;
+  opacity: 1;
+}
+
+
+
+.hlcc-card-title {
+  font-size: 13px;
+  /* Reduced further */
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
+}
+
+.hlcc-card-meta {
+  margin-top: 4px;
+  /* Ensure spacing */
+  width: 100%;
+}
+
+.hlcc-mini-progress-wrap {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hlcc-mini-progress-bar {
+  height: 100%;
+  background: #94a3b8;
+  /* Default muted color */
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.hlcc-timeline-card-item.is-active .hlcc-mini-progress-bar {
+  background: #fff;
+  /* Active bright white */
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+.hlcc-card-note {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.hlcc-timeline-card-item.is-active .hlcc-card-note {
+  background: rgba(59, 130, 246, 0.4);
+  /* Darker background for active note contrast */
+  color: #fff;
+  /* Pure white text for active note */
+  opacity: 1;
+}
+
+/* 4. Guestbook (Pro Max) */
+.hlcc-gb-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  animation: hlcc-fade-in 0.4s ease forwards;
+}
+
+.hlcc-gb-avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+
+.hlcc-gb-main {
+  flex: 1;
+}
+
+.hlcc-gb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.hlcc-gb-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.hlcc-gb-date {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.hlcc-gb-content {
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.6;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 0 12px 12px 12px;
+  position: relative;
+}
+
+.hlcc-gb-item.is-admin .hlcc-gb-content {
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+}
+
+.hlcc-gb-reply {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0fdf4;
+  /* Green tint for official reply */
+  border-left: 3px solid #22c55e;
+  font-size: 13px;
+  color: #166534;
+  border-radius: 4px;
+}
+
+.hlcc-gb-reply-label {
+  font-weight: bold;
+  font-size: 11px;
+  margin-bottom: 2px;
+  color: #15803d;
+}
+
+.hlcc-gb-item.is-pinned .hlcc-gb-content::before {
+  content: "📌 置顶";
+  display: block;
+  font-size: 11px;
+  color: #f59e0b;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.hlcc-gb-actions {
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.hlcc-btn-xs {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.hlcc-btn-xs:hover {
+  background: #f1f5f9;
+}
+
+.hlcc-text-danger {
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+.hlcc-text-danger:hover {
+  background: #fef2f2;
+}
+
+.hlcc-end-state {
+  text-align: center;
+  color: #94a3b8;
+  padding: 20px;
+  font-size: 12px;
+  border-top: 1px dashed #e2e8f0;
+  margin-top: 20px;
+}
+
+/* ============================================================
+   HLCC WORDS TO YOU MODAL (v8.3.34) - RE-APPLIED
+   ============================================================ */
+
+/* Base Modal Container - ID Specific to avoid conflicts */
+#hlcc-words-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: flex-end;
+  /* Mobile Bottom Sheet */
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#hlcc-words-modal.hlcc-active {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+#hlcc-words-modal .hlcc-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 1;
+}
+
+#hlcc-words-modal .hlcc-modal-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 600px;
+  height: 70vh;
+  /* Reduced from 90vh for "breathable" feel */
+  background: #fff;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+  #hlcc-words-modal {
+    align-items: center;
+  }
+
+  #hlcc-words-modal .hlcc-modal-container {
+    height: auto;
+    min-height: 600px;
+    max-height: 85vh;
+    border-radius: 24px;
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+#hlcc-words-modal.hlcc-active .hlcc-modal-container {
+  transform: translateY(0);
+}
+
+@media (min-width: 768px) {
+  #hlcc-words-modal.hlcc-active .hlcc-modal-container {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header */
+#hlcc-words-modal .hlcc-modal-header {
+  padding: 16px;
+  /* Reduced specific padding */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  /* Context for absolute positioning if needed, though flex is better */
+  gap: 12px;
+  /* Gap between segments and close btn */
+}
+
+#hlcc-words-modal .hlcc-segmented-control {
+  display: flex;
+  background: rgba(118, 118, 128, 0.12);
+  padding: 2px;
+  border-radius: 8px;
+  position: relative;
+  flex: 1;
+  margin-right: 16px;
+}
+
+#hlcc-words-modal .hlcc-segment-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1c1c1e;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+#hlcc-words-modal .hlcc-segment-btn.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+#hlcc-words-modal .hlcc-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(118, 118, 128, 0.12);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1c1c1e;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#hlcc-words-modal .hlcc-modal-close:hover {
+  background: rgba(118, 118, 128, 0.24);
+}
+
+/* Body */
+#hlcc-words-modal .hlcc-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  position: relative;
+}
+
+#hlcc-words-modal .hlcc-tab-content {
+  display: none;
+  animation: hlcc-fade-in 0.3s ease;
+}
+
+#hlcc-words-modal .hlcc-tab-content.active {
+  display: block;
+}
+
+/* Letter Content */
+.hlcc-letter-paper {
+  background: #fff;
+  padding: 24px;
+  border-radius: 1px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  font-family: var(--hlcc-font-sans);
+  /* Changed to sans-serif */
+  color: #333;
+  line-height: 1.6;
+  /* Adjusted for sans-serif */
+  position: relative;
+}
+
+.hlcc-letter-paper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6 0%, #a855f7 100%);
+  opacity: 0.5;
+}
+
+.hlcc-letter-header {
+  font-size: 15px;
+  /* Reduced from 18px */
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.hlcc-letter-body p {
+  margin-bottom: 12px;
+  text-indent: 2em;
+  font-size: 13px;
+  /* Added 13px requirement */
+}
+
+.hlcc-letter-footer {
+  margin-top: 30px;
+  text-align: right;
+  font-size: 12px;
+  /* Reduced from 14px */
+  color: #666;
+}
+
+/* Changelog Content */
+.hlcc-changelog-timeline {
+  padding-left: 12px;
+  border-left: 2px solid #e5e7eb;
+}
+
+.hlcc-timeline-item {
+  position: relative;
+  margin-bottom: 8px;
+  /* Further reduced from 12px */
+  padding-left: 14px;
+  /* Reduced from 20px */
+}
+
+.hlcc-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+}
+
+.hlcc-timeline-date {
+  font-size: 9px;
+  /* Reduced from 10px */
+  color: #9ca3af;
+  margin-bottom: 2px;
+}
+
+.hlcc-timeline-card {
+  background: #f9fafb;
+  padding: 6px 8px;
+  /* Further reduced from 8px */
+  border-radius: 6px;
+  border: 1px solid #f3f4f6;
+  margin-top: 2px;
+}
+
+.hlcc-tag {
+  display: inline-block;
+  padding: 0px 3px;
+  /* Minimal padding */
+  border-radius: 2px;
+  font-size: 8px !important;
+  font-weight: bold;
+  margin-bottom: 1px;
+  color: #fff;
+  transform: scale(0.9);
+  transform-origin: left center;
+}
+
+.hlcc-tag-new {
+  background: #10b981;
+}
+
+.hlcc-tag-fix {
+  background: #f59e0b;
+}
+
+.hlcc-tag-improve {
+  background: #3b82f6;
+}
+
+.hlcc-modal-close {
+  /* Switch to static positioning for flex alignment */
+  position: static;
+  width: 28px;
+  /* Slightly smaller */
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.8);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s ease;
+  z-index: 20;
+  /* Remove top/right since we use flex gap */
+}
+
+.hlcc-modal-close svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2;
+  display: block;
+}
+
+.hlcc-modal-header {
+  position: relative;
+  padding-right: 48px;
+  /* Reserve space for close button */
+}
+
+.hlcc-modal-close:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  transform: rotate(90deg);
+}
+
+.hlcc-loading-state {
+  text-align: center;
+  color: #94a3b8;
+  padding: 20px;
+  font-size: 14px;
+}
+
+@keyframes hlcc-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hlcc-pulse-pill {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4);
+  }
+
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 6px rgba(14, 165, 233, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+  }
+}
+
+/* Pill Hint */
+.hlcc-pill-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f9ff;
+  color: #0369a1;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.15);
+  animation: hlcc-bounce-hint 2s infinite;
+}
+
+.hlcc-pill-hint:hover {
+  background: #e0f2fe;
+}
+
+@keyframes hlcc-bounce-hint {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Pill Button Variant (Suggestive Style) */
+.hlcc-btn.is-pill {
+  border-radius: 999px;
+  padding: 10px 24px;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  background: #f0f9ff;
+  color: #0284c7;
+  /* Blue text */
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+  animation: hlcc-pulse-pill 2s infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.hlcc-btn.is-pill:hover {
+  background: #e0f2fe;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.2);
+}
+
+.hlcc-btn.is-pill .hlcc-btn-icon-svg {
+  stroke: #0284c7;
+  /* Ensure icon matches text */
+}
+
+/* 
+ * v8.3.49 UI Updates 
+ * "Team Message" and "Changelog" adjustments
+ * Non-serif, smaller font
+ */
+#hlcc-changelog,
+.hlcc-card-title,
+.hlcc-card-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* Specific targeting for "Team Message" (致每一位努力的你) content if possible, or generic message body */
+.hlcc-message-card .hlcc-card-body {
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+/* 
+ * v8.3.55 UI ULTRA-COMPACT FIX  
+ * We use the .hlcc-wrap container class to increase specificity further.
+ */
+.hlcc-wrap #hlcc-changelog h4,
+#hlcc-changelog h4 {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  margin-top: 5px !important;
+  margin-bottom: 3px !important;
+  padding: 0 !important;
+  color: #64748b !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hlcc-wrap #hlcc-changelog ul.hlcc-tm-list,
+#hlcc-changelog ul.hlcc-tm-list {
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+.hlcc-wrap #hlcc-changelog ul.hlcc-tm-list li,
+.hlcc-wrap #hlcc-changelog .hlcc-tm-list li,
+#hlcc-changelog ul.hlcc-tm-list li,
+#hlcc-changelog .hlcc-tm-list li {
+  font-size: 8px !important;
+  /* Extremely small as requested */
+  line-height: 1.1 !important;
+  margin-bottom: 2px !important;
+  padding: 0 !important;
+  display: block !important;
+  color: #94a3b8 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.hlcc-wrap #hlcc-changelog ul.hlcc-tm-list li strong,
+#hlcc-changelog ul.hlcc-tm-list li strong {
+  font-weight: 500 !important;
+  color: #64748b !important;
+}
+
+.hlcc-timeline-card {
+  padding: 4px 6px !important;
+  /* Aggressive reduction */
+  border-radius: 4px !important;
+  margin-top: 1px !important;
+}
+
+.hlcc-timeline-item {
+  position: relative;
+  margin-bottom: 2px !important;
+  /* Aggressive reduction from 8px */
+  padding-left: 10px !important;
+  /* Aggressive reduction from 14px */
+}
+
+/* Version info tiny */
+.hlcc-version-info {
+  font-size: 10px;
+  /* Reduced from 12px */
+  text-align: center;
+  margin-top: 20px;
+  color: rgba(148, 163, 184, 0.6);
+}
+
+/* Ensure Username Visibility in Guestbook List */
+.hlcc-gm-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-right: 8px;
+}
+
+/* Ensure Admin Actions Visibility */
+.hlcc-admin-actions {
+  display: block;
+  opacity: 0.8;
+}
+
+.hlcc-admin-actions:hover {
+  opacity: 1;
+}
+
+/* =========================================
+   Guestbook Fixes & Improvements (v8.3.x)
+   ========================================= */
+
+/* 1. Missing Admin Buttons */
+.hlcc-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #94a3b8;
+  /* text-muted */
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+
+.hlcc-action-btn:hover {
+  background: #f1f5f9;
+  color: #2563eb;
+  /* primary */
+}
+
+.hlcc-action-btn svg {
+  /* Ensure sizing if SVG is used directly */
+  width: 16px;
+  height: 16px;
+}
+
+.hlcc-pin-btn.active {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.hlcc-delete-btn:hover {
+  color: #ef4444;
+  /* danger */
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* 2. "To Everyone" Letter Typography */
+/* User requested Sans-serif and smaller size */
+.hlcc-letter-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.6;
+  color: #4b5563 !important;
+}
+
+/* 3. Guestbook Filter Bar (if missing) */
+.hlcc-gb-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.hlcc-gb-filter-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.hlcc-gb-filter-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+/* 4. Pinned Message Styling */
+.hlcc-gm-pinned {
+  background: rgba(255, 247, 237, 0.6) !important;
+  /* amber-50 */
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  position: relative;
+}
+
+.hlcc-gm-pinned::after {
+  content: "置顶";
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-bottom-left-radius: 6px;
+  font-weight: 500;
+}
+
+/* 5. Avatar Placeholder */
+.hlcc-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e2e8f0;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 16px;
+  border-radius: 50%;
+}
+
+/* 6. Animations */
+@keyframes hlccPopIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fix body scroll when modal is open */
+body.hlcc-lock-scroll {
+  overflow: hidden !important;
+  height: 100vh;
+  touch-action: none;
+}
+
+.hlcc-hidden {
+  display: none;
+}
+
+/* ========================================================================
+   v8.7.6: Modern Changelog Card Design (Written to CSS file for maximum compatibility)
+   ======================================================================== */
+
+/* Changelog Container */
+#hlcc-words-modal .hlcc-tab-content#hlcc-tab-changelog {
+  padding: 16px 12px;
+  background: #f8fafc;
+}
+
+#hlcc-words-modal .hlcc-changelog-compact {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Card Container */
+#hlcc-words-modal .hlcc-changelog-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: visible;
+}
+
+#hlcc-words-modal .hlcc-changelog-row:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 4px 8px rgba(0, 0, 0, 0.08);
+  border-color: #94a3b8;
+}
+
+/* Type-specific left borders */
+#hlcc-words-modal .hlcc-changelog-row[data-type="new"] {
+  border-left: 4px solid #10b981;
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="new"]:hover {
+  background: linear-gradient(135deg, #d1fae5 0%, #ffffff 50%, #f0fdf4 100%);
+  border-color: #10b981;
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="improve"] {
+  border-left: 4px solid #3b82f6;
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="improve"]:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #ffffff 50%, #eff6ff 100%);
+  border-color: #3b82f6;
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="fix"] {
+  border-left: 4px solid #f59e0b;
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="fix"]:hover {
+  background: linear-gradient(135deg, #fef3c7 0%, #ffffff 50%, #fffbeb 100%);
+  border-color: #f59e0b;
+}
+
+/* Icon Container */
+#hlcc-words-modal .hlcc-changelog-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="new"] .hlcc-changelog-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="improve"] .hlcc-changelog-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+#hlcc-words-modal .hlcc-changelog-row[data-type="fix"] .hlcc-changelog-icon {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+#hlcc-words-modal .hlcc-changelog-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.5;
+}
+
+#hlcc-words-modal .hlcc-changelog-row:hover .hlcc-changelog-icon {
+  transform: scale(1.15) rotate(8deg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Content Area */
+#hlcc-words-modal .hlcc-changelog-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#hlcc-words-modal .hlcc-changelog-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+#hlcc-words-modal .hlcc-changelog-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: #fff;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+#hlcc-words-modal .hlcc-tag-new {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+#hlcc-words-modal .hlcc-tag-improve {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+#hlcc-words-modal .hlcc-tag-fix {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+#hlcc-words-modal .hlcc-changelog-date {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+#hlcc-words-modal .hlcc-changelog-date:before {
+  content: "📅 ";
+  opacity: 0.8;
+}
+
+#hlcc-words-modal .hlcc-changelog-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+#hlcc-words-modal .hlcc-changelog-text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64748b;
+  word-break: break-word;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  #hlcc-words-modal .hlcc-changelog-row {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  #hlcc-words-modal .hlcc-changelog-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  #hlcc-words-modal .hlcc-changelog-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+
+
+/* ========================================
+   v8.8.0: Nested Reply Styles
+   ======================================== */
+
+/* Reply section container */
+.hlcc-gb-reply-section,
+.hlcc-gm-reply-section {
+  margin-top: 12px;
+}
+
+/* Reply toggle button */
+.hlcc-reply-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hlcc-reply-toggle-btn:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.hlcc-reply-icon {
+  font-size: 1rem;
+}
+
+.hlcc-reply-text {
+  font-weight: 500;
+}
+
+.hlcc-reply-count {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+/* Replies container - nested indented style */
+.hlcc-replies-container {
+  margin-top: 12px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 2px solid #e5e7eb;
+  display: none;
+}
+
+.hlcc-replies-container.is-visible {
+  display: block;
+}
+
+/* Reply list */
+.hlcc-replies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Empty states for replies */
+.hlcc-reply-empty,
+.hlcc-reply-loading,
+.hlcc-reply-error {
+  padding: 12px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.hlcc-reply-loading {
+  color: #64748b;
+}
+
+.hlcc-reply-error {
+  color: #ef4444;
+}
+
+/* Individual reply item */
+.hlcc-reply-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  animation: hlccFadeIn 0.3s ease-out;
+}
+
+.hlcc-reply-item.is-privileged {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+.hlcc-reply-item.is-admin {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-left: 3px solid #3b82f6;
+}
+
+/* Reply avatar */
+.hlcc-reply-avatar {
+  flex-shrink: 0;
+}
+
+.hlcc-reply-avatar img,
+.hlcc-reply-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.hlcc-reply-item.is-privileged .hlcc-reply-avatar img,
+.hlcc-reply-item.is-privileged .hlcc-reply-avatar-img {
+  border: 2px solid #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Reply content */
+.hlcc-reply-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hlcc-reply-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.hlcc-reply-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.85rem;
+}
+
+.hlcc-reply-item.is-privileged .hlcc-reply-name::after {
+  content: "✓";
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 4px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.hlcc-reply-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.hlcc-reply-body {
+  color: #475569;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Reply actions */
+.hlcc-reply-actions {
+  margin-top: 4px;
+}
+
+.hlcc-reply-delete-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hlcc-reply-delete-btn:hover {
+  background: #fee2e2;
+}
+
+/* Reply input button - triggers main input box */
+.hlcc-reply-input-btn {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hlcc-reply-input-btn:hover {
+  background: #dbeafe;
+}
+
+/* Reply list footer */
+.hlcc-reply-list-footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  text-align: center;
+}
+
+.hlcc-reply-list-footer .hlcc-reply-input-btn {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  background: #eff6ff;
+  color: #3b82f6;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.hlcc-reply-list-footer .hlcc-reply-input-btn:hover {
+  background: #dbeafe;
+}
+
+/* Reply input wrapper */
+.hlcc-reply-input-wrapper {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.hlcc-reply-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.hlcc-reply-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.hlcc-reply-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 12px;
+}
+
+.hlcc-reply-chars {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.hlcc-submit-reply-btn {
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hlcc-submit-reply-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.hlcc-submit-reply-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Login hint for guests */
+.hlcc-reply-login-hint {
+  padding: 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.hlcc-reply-login-hint a {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hlcc-reply-login-hint a:hover {
+  text-decoration: underline;
+}
+
+/* Reply hint in main form */
+.hlcc-reply-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1e40af;
+}
+
+.hlcc-reply-hint strong {
+  color: #1d4ed8;
+  margin-left: 2px;
+}
+
+.hlcc-reply-hint button {
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  color: #64748b;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hlcc-reply-hint button:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #ef4444;
+}
+
+/* Animation */
+@keyframes hlccFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 480px) {
+  .hlcc-replies-container {
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left-width: 1px;
+  }
+
+  .hlcc-reply-item {
+    padding: 8px;
+  }
+
+  .hlcc-reply-avatar img,
+  .hlcc-reply-avatar-img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .hlcc-reply-textarea {
+    min-height: 50px;
+    font-size: 0.8rem;
+  }
+}

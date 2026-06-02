@@ -1,0 +1,17 @@
+{
+    "name": "hlcc/handlock-care-center",
+    "description": "HandLock Care Center - WordPress 客户护理中心插件",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0+",
+    "autoload": {
+        "psr-4": {
+            "HLCC\\": "includes/"
+        }
+    },
+    "require": {
+        "php": ">=7.4"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

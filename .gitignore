@@ -1,0 +1,21 @@
+.DS_Store
+
+# Runtime and local exports
+*.log
+*.tmp
+*.zip
+*.sql
+*.tar
+*.gz
+
+# WordPress and plugin-local backup artifacts
+backup/
+backups/
+uploads/
+storage/
+
+# Dependency and editor caches
+vendor/
+node_modules/
+.idea/
+.vscode/

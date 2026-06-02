@@ -1,0 +1,165 @@
+/* HandLock Care Center Admin Styles v8.7.1 */
+
+.hlcc-admin .hlcc-badge {
+  background: #2271b1;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.hlcc-admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.hlcc-admin-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.hlcc-course-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.hlcc-course-block.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, .15) inset;
+}
+
+.hlcc-course-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.hlcc-course-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -2px 0 10px;
+}
+
+.hlcc-tag {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.hlcc-tag.hlcc-tag-warn {
+  background: #f59e0b;
+}
+
+.hlcc-muted {
+  color: #6b7280;
+}
+
+.hlcc-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hlcc-inline {
+  margin: 6px 0;
+}
+
+.hlcc-tutorial-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.hlcc-step-list {
+  margin: 12px 0;
+  padding-left: 18px;
+}
+
+.hlcc-step-list li {
+  position: relative;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin: 8px 0;
+  background: #fafafa;
+}
+
+.hlcc-step-list li.active {
+  border-color: #2563eb;
+  background: #f0f6ff;
+}
+
+.hlcc-step-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.button.small {
+  padding: 0 8px;
+  min-height: 28px;
+  line-height: 26px;
+}
+
+@media (max-width: 1100px) {
+  .hlcc-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hlcc-tutorial-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.button-link-delete {
+  color: #b32d2e;
+  border-color: #b32d2e;
+}
+
+.button-link-delete:hover {
+  color: #8a1f1f;
+  border-color: #8a1f1f;
+}
+
+.hlcc-inline-delete {
+  margin-left: 8px;
+}
+
+/* Editor Tips for Card Layout */
+.hlcc-admin-editor-tip {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0c4a6e;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hlcc-admin-editor-tip.hlcc-tip-red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.hlcc-tip-icon {
+  font-size: 16px;
+}
