@@ -20,7 +20,7 @@
 ## 🚀 快速开始
 
 ```bash
-git clone https://github.com/keysmo1992/handlock-care-center.git
+git clone https://github.com/CNkeysmo/handlock-care-center.git
 cd handlock-care-center
 ```
 
