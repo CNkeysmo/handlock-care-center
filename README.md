@@ -2,9 +2,28 @@
 
 HandLock Care Center is a self-hosted WordPress plugin for tattoo-removal aftercare and customer recovery management.
 
-It combines customer course tracking, mobile login sessions, tutorial content, care-content editing, wiki / FAQ management, and treatment photo comparison in a single plugin intended for clinic-operated WordPress sites.
+It was originally built for a clinic-operated WordPress site and combines customer course tracking, recovery guidance, mobile login sessions, wiki / FAQ content management, and treatment photo comparison in a single plugin.
 
-This repository is a sanitized open-source snapshot of the codebase. Production exports, customer data, deployment-specific URLs, and private operational artifacts have been removed before publication.
+This repository is a sanitized open-source release of that discontinued internal project. Production exports, customer data, deployment-specific URLs, and private operational artifacts have been removed before publication.
+
+## Overview
+
+Use this project if you need a WordPress-based recovery portal that can:
+
+- manage customer accounts and treatment course records
+- publish phase-based aftercare guidance on the frontend
+- maintain clinic knowledge-base or FAQ content
+- support app-linked login sessions and token refresh flows
+- compare treatment photos during customer follow-up
+
+## Quick Start
+
+```bash
+git clone https://github.com/keysmo1992/handlock-care-center.git
+cd handlock-care-center
+```
+
+Copy the plugin into `wp-content/plugins/handlock-care-center`, activate it in WordPress, and create a page with the shortcode `[hlcc_care_center]`.
 
 ## What This Project Does
 
@@ -31,13 +50,6 @@ This is an open-sourced snapshot of a discontinued internal project.
 - WordPress
 - PHP 7.4+
 - MySQL or MariaDB
-
-## Clone This Repository
-
-```bash
-git clone https://github.com/keysmo1992/handlock-care-center.git
-cd handlock-care-center
-```
 
 ## Install Locally
 
